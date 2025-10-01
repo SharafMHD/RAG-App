@@ -8,7 +8,6 @@ base_router = APIRouter(
     prefix="/api/v1",
     tags=["Base"],
 )
-
 @base_router.get("/welcome")
 async def welcome_message():
     return {"message": "Welcome to the RAG-APP 2!",

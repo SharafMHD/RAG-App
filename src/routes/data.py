@@ -12,6 +12,8 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
     
     # validate file type and size
     is_valid , ResponseStatus = DataController().validate_uploded_file(file)
+    print(is_valid , ResponseStatus)
+     # if file is not valid return error response
     if not is_valid:
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"status": is_valid, 
             "project_id": project_id, 

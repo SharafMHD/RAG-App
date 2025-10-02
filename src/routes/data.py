@@ -1,5 +1,6 @@
 from fastapi import UploadFile, Depends, APIRouter, status
 from fastapi.responses import JSONResponse
+from models import ResponseStatus
 from helpers.config import get_settings, Settings
 from controllers import DataController
 import logging
@@ -39,7 +40,7 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
             "file_name": file.filename,
             "file_type": file.content_type, 
             "file_size": file.size, 
-            "message": "Failed to upload file"})
+            "message": ResponseStatus.FILE_UPLOAD_ERROR.value})
 
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
         "project_id": project_id, 
@@ -47,7 +48,7 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
         "file_type": file.content_type, 
         "file_size": file.size, 
         "file_id": file_id,
-        "message": "File uploaded successfully"})
+        "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
 
 
 

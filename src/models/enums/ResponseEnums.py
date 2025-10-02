@@ -4,8 +4,8 @@ class ResponseStatus(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
     WARNING = "warning"
-    FILE_UPLOAD_ERROR = "file_upload_error"
-    FILE_UPLODED_SUCCESS = "file_upload_success"
-    FILE_SZIE_EXCEEDS = "file_size_exceeds"
-    FILE_TYPE_NOT_ALLOWED = "file_type_not_allowed"
+    FILE_UPLOAD_ERROR = "file upload failed"
+    FILE_UPLODED_SUCCESS = "file uploaded successfully"
+    FILE_SZIE_EXCEEDS = "file size exceeds the allowed limit"
+    FILE_TYPE_NOT_ALLOWED = "file type is not allowed"
     

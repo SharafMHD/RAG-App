@@ -1,7 +1,9 @@
 from fastapi import UploadFile, Depends, APIRouter , status
 from fastapi.responses import JSONResponse
 from helpers import get_settings , Settings
-from controllers import DataController
+from controllers import DataController , ProjectController
+import os
+import aiofiles
 
 data_router = APIRouter(
     prefix="/api/v1/data",
@@ -21,5 +23,21 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
             "file_type": file.content_type, 
             "file_size": file.size, 
             "message": ResponseStatus})
+    project_dir_path = ProjectController().get_project_dir_path(project_id)
+    file_path = os.path.join(project_dir_path , file.filename)
+    print(file_path,app_settings.FILE_DEFAULT_CHUNK_SIZE)
+    # save file to disk
+    async with aiofiles.open(file_path, "wb") as f:
+        while chunk := await file.read(app_settings.FILE_DEFAULT_CHUNK_SIZE):  # Read file in chunks
+            await f.write(chunk)
+    await file.close()
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
+        "project_id": project_id, 
+        "file_name": file.filename,
+        "file_type": file.content_type, 
+        "file_size": file.size, 
+        "message": "File uploaded successfully"})
+
 
 

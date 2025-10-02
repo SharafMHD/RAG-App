@@ -10,6 +10,10 @@ class Settings(BaseSettings):
 
     FILE_ALLWOED_TYPES: list[str] = ["text/plain", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     FILE_ALLOWED_SZIE: int = 10 # in MB
+    UPLOAD_DIR: str = "assets/files"
+    FILE_DEFAULT_CHUNK_SIZE: int = 512000 # in kb
+    FILE_OVERLAP_SIZE: int = 5120 # in kbs
+
     # pydantic v2 style configuration for loading an env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

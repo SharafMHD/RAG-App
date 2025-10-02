@@ -1,0 +1,33 @@
+
+Travel Plan: Hanoi
+Duration: 3 days
+Budget: 525.00 AED
+Status: Under Budget
+
+Itinerary:
+
+Day 1:
+  - Arrival and check-in at hotel (100.00 AED)
+    Source: https://www.booking.com
+  - Visit Hoan Kiem Lake and Ngoc Son Temple (50.00 AED)
+    Source: https://www.hanoitourism.com/hoan-kiem-lake
+  - Explore the Old Quarter (50.00 AED)
+    Source: https://www.hanoitourism.com/old-quarter
+
+Day 2:
+  - Take a cooking class (169.00 AED)
+    Source: https://www.cookingclassinhanoi.com
+  - Visit the Vietnam Museum of Ethnology (40.00 AED)
+    Source: https://www.vme.gov.vn
+  - Explore the local markets (30.00 AED)
+    Source: https://www.hanoitourism.com/local-markets
+
+Day 3:
+  - Shopping at Dong Xuan Market (40.00 AED)
+    Source: https://www.hanoitourism.com/dong-xuan-market
+  - Visit the Temple of Literature (30.00 AED)
+    Source: https://www.hanoitourism.com/temple-of-literature
+  - Departure activities and last-minute sightseeing (20.00 AED)
+    Source: https://www.hanoitourism.com/sightseeing
+
+Notes: Itinerary includes a mix of cultural experiences, local exploration, and shopping while maintaining a budget-friendly approach.

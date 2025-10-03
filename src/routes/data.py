@@ -5,6 +5,7 @@ from helpers.config import get_settings, Settings
 from controllers import DataController
 import logging
 import aiofiles
+from routes.schemes.data import ProcessRequest
 
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
@@ -50,5 +51,10 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
         "file_id": file_id,
         "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
 
-
-
+@data_router.post("/process/{project_id}")
+async def process_file(project_id:str, process_request: ProcessRequest):
+    file_id = process_request.file_id
+    chunk_size = process_request.chunk_size
+    overlap_size = process_request.overlap_size
+    do_reset = process_request.do_reset
+    return {"status": True, "message": f"Processing file {file_id} for project {project_id} with chunk size {chunk_size}, overlap size {overlap_size}, reset={do_reset}"}

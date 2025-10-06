@@ -8,4 +8,6 @@ class ResponseStatus(str, Enum):
     FILE_UPLODED_SUCCESS = "file uploaded successfully"
     FILE_SZIE_EXCEEDS = "file size exceeds the allowed limit"
     FILE_TYPE_NOT_ALLOWED = "file type is not allowed"
+    FILE_PROCESSING_ERROR = "file processing failed"
+    FILE_PROCESSED_SUCCESS = "file processed successfully"
     

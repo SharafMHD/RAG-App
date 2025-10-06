@@ -2,7 +2,7 @@ from fastapi import UploadFile, Depends, APIRouter, status
 from fastapi.responses import JSONResponse
 from models import ResponseStatus
 from helpers.config import get_settings, Settings
-from controllers import DataController
+from controllers import DataController , ProcessFileController
 import logging
 import aiofiles
 from routes.schemes.data import ProcessRequest
@@ -51,10 +51,20 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
         "file_id": file_id,
         "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
 
-@data_router.post("/process/{project_id}")
+@data_router.post("/processfile/{project_id}")
 async def process_file(project_id:str, process_request: ProcessRequest):
     file_id = process_request.file_id
     chunk_size = process_request.chunk_size
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
-    return {"status": True, "message": f"Processing file {file_id} for project {project_id} with chunk size {chunk_size}, overlap size {overlap_size}, reset={do_reset}"}
+    process_file_controller = ProcessFileController(project_id)
+    file_content = process_file_controller.get_document_content(file_id)
+    chunks = process_file_controller.process_file(file_content, chunk_size, overlap_size)
+    
+    if not chunks:
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
+            "project_id": project_id, 
+            "file_id": file_id,
+            "message": ResponseStatus.FILE_PROCESSING_ERROR.value})
+    
+    return {"status": True, "message": f"Processing file {file_id} for project {project_id} with chunk size {chunk_size}, overlap size {overlap_size}, reset={do_reset}" , "chunks_count": len(chunks), "chunks": chunks}

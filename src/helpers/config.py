@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     FILE_DEFAULT_CHUNK_SIZE: int = 512000 # in kb
     FILE_OVERLAP_SIZE: int = 5120 # in kbs
 
+    MONGODB_URL:str = "mongodb://localhost:27017"
+    MONGODB_DB_NAME: str = "rag_app_db"
     # pydantic v2 style configuration for loading an env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

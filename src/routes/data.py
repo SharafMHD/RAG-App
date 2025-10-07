@@ -1,4 +1,4 @@
-from fastapi import UploadFile, Depends, APIRouter, status
+from fastapi import UploadFile, Depends, APIRouter, status , Request
 from fastapi.responses import JSONResponse
 from models import ResponseStatus
 from helpers.config import get_settings, Settings
@@ -6,6 +6,7 @@ from controllers import DataController , ProcessFileController
 import logging
 import aiofiles
 from routes.schemes.data import ProcessRequest
+from models.ProjectDataModel import ProjectDataModel
 
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
@@ -13,8 +14,9 @@ data_router = APIRouter(
     tags=["Base" , "Data"],
 )
 @data_router.post("/upload/{project_id}")
-async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=Depends(get_settings)):
-    
+async def upload_file(request:Request,project_id:str, file: UploadFile , app_settings: Settings=Depends(get_settings)):
+    project_model = ProjectDataModel(db_client=request.app.mongodb_client)
+    new_project = await project_model.get_project_or_create(project_id)
     # validate file type and size
     controller = DataController()
     is_valid, response_status = controller.validate_uploded_file(file)
@@ -35,7 +37,6 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
                 await f.write(chunk)
         await file.close()
     except Exception as e:
-        logger.error(f"Error saving file {file.filename} for project {project_id}: {e}")
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
             "project_id": project_id, 
             "file_name": file.filename,
@@ -44,7 +45,6 @@ async def upload_file(project_id:str, file: UploadFile , app_settings: Settings=
             "message": ResponseStatus.FILE_UPLOAD_ERROR.value})
 
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
-        "project_id": project_id, 
         "file_name": file.filename,
         "file_type": file.content_type, 
         "file_size": file.size, 

@@ -2,7 +2,8 @@ from .BaseController import BaseController
 from .ProjectController import ProjectController
 import os
 from models.enums.ProcessFileEnums import ProcessFileEnums
-from langchain.document_loaders import TextLoader, PyMuPDFLoader
+#from langchain.document_loaders import TextLoader, PyMuPDFLoader
+from langchain_community.document_loaders import TextLoader,PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 class ProcessFileController(BaseController):

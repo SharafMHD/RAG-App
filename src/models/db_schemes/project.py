@@ -4,7 +4,7 @@ from bson.objectid  import ObjectId
 from datetime import datetime, timezone
 
 class Project(BaseModel):
-    _id: Optional[ObjectId] 
+    id: Optional[ObjectId] = Field(default=None, alias="_id")
     project_id: str = Field(..., min_length=1)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  

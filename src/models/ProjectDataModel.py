@@ -11,7 +11,7 @@ class ProjectDataModel(BaseDataModel):
 
     async def create_project(self, project_data: Project) -> Project:
         """Create a new project in the database."""
-        result = await self.collection.insert_one(project_data.dict())
+        result = await self.collection.insert_one(project_data.dict(by_alias=True,exclude_unset=True))
         project_data._id = result.inserted_id
         return project_data
     

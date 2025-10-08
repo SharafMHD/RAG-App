@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 
 class DataChunk(BaseModel):
-    _id: Optional[ObjectId] 
+    id: Optional[ObjectId] = Field(default=None, alias="_id")
     chunk_text: str = Field(..., min_length=1)
     chunk_metadata: Optional[dict] = None
     chunk_order: int = Field(..., gt=0)

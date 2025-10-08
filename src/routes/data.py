@@ -7,6 +7,9 @@ import logging
 import aiofiles
 from routes.schemes.data import ProcessRequest
 from models.ProjectDataModel import ProjectDataModel
+from models.ChunksDataModel import ChunkDataModel
+
+from models.db_schemes import DataChunk
 
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
@@ -52,19 +55,41 @@ async def upload_file(request:Request,project_id:str, file: UploadFile , app_set
         "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
 
 @data_router.post("/processfile/{project_id}")
-async def process_file(project_id:str, process_request: ProcessRequest):
+async def process_file(request:Request,project_id:str, process_request: ProcessRequest):
     file_id = process_request.file_id
     chunk_size = process_request.chunk_size
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
+
+    project_model = ProjectDataModel(db_client=request.app.mongodb_client)
+    project = await project_model.get_project_or_create(project_id)
+
+    chunk_model = ChunkDataModel(db_client=request.app.mongodb_client)
+
     process_file_controller = ProcessFileController(project_id)
     file_content = process_file_controller.get_document_content(file_id)
-    chunks = process_file_controller.process_file(file_content, chunk_size, overlap_size)
+    file_chunks = process_file_controller.process_file(file_content, chunk_size, overlap_size)
+    file_chunks_records = [ 
+        DataChunk(
+                chunk_text=chunk.page_content,
+                chunk_metadata= chunk.metadata,
+                chunk_order= i+1,
+                chunk_project_id=str(project.id)
+            )
+        for i, chunk in enumerate(file_chunks)
+    ]
     
-    if not chunks:
+    """Validate if do reset is true delete all existing chunks for the project"""
+    if do_reset:
+        await chunk_model.delete_chunks_by_project(str(project.id))
+
+    inserted_count = await chunk_model.bulk_insert_data_chunks(file_chunks_records)
+    if not inserted_count:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
             "project_id": project_id, 
             "file_id": file_id,
+            "inserted_count": inserted_count,
             "message": ResponseStatus.FILE_PROCESSING_ERROR.value})
     
-    return {"status": True, "message": f"Processing file {file_id} for project {project_id} with chunk size {chunk_size}, overlap size {overlap_size}, reset={do_reset}" , "chunks_count": len(chunks), "chunks": chunks}
+    return {"status": True, "message": f"Processing file {file_id} for project {project_id} with chunk size {chunk_size}, overlap size {overlap_size}, reset={do_reset}" , "chunks_count": len(file_chunks), "chunks": file_chunks}
+

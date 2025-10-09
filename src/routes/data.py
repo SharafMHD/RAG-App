@@ -5,11 +5,14 @@ from helpers.config import get_settings, Settings
 from controllers import DataController , ProcessFileController
 import logging
 import aiofiles
+import os
 from routes.schemes.data import ProcessRequest
 from models.ProjectDataModel import ProjectDataModel
 from models.ChunksDataModel import ChunkDataModel
+from models.AssetModel import AssetModel
+from models.db_schemes import DataChunk , Assest
+from models.enums.AssetTypeEnum import AssetTypeEnum
 
-from models.db_schemes import DataChunk
 
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
@@ -47,16 +50,28 @@ async def upload_file(request:Request,project_id:str, file: UploadFile , app_set
             "file_size": file.size, 
             "message": ResponseStatus.FILE_UPLOAD_ERROR.value})
 
+    # Store Asset metadata in the database
+    asset_model = await AssetModel.create_instance(db_client=request.app.mongodb_client)
+    asset_resource = Assest(
+            asset_project_id= new_project.id,
+            asset_name= file_id,
+            asset_type= AssetTypeEnum.File.value,
+            asset_szie = os.path.getsize(file_path)
+            )
+    asset_record= await asset_model.create_asset(asset_resource)
+
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
         "file_name": file.filename,
         "file_type": file.content_type, 
         "file_size": file.size, 
         "file_id": file_id,
+        "asset_id": str(asset_record.id),
         "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
 
 @data_router.post("/processfile/{project_id}")
 async def process_file(request:Request,project_id:str, process_request: ProcessRequest):
-    file_id = process_request.file_id
+   
+   # file_id = process_request.file_id
     chunk_size = process_request.chunk_size
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
@@ -67,29 +82,66 @@ async def process_file(request:Request,project_id:str, process_request: ProcessR
     chunk_model =await  ChunkDataModel.create_instance(db_client=request.app.mongodb_client)
 
     process_file_controller = ProcessFileController(project_id)
-    file_content = process_file_controller.get_document_content(file_id)
-    file_chunks = process_file_controller.process_file(file_content, chunk_size, overlap_size)
-    file_chunks_records = [ 
-        DataChunk(
-                chunk_text=chunk.page_content,
-                chunk_metadata= chunk.metadata,
-                chunk_order= i+1,
-                chunk_project_id=str(project.id)
-            )
-        for i, chunk in enumerate(file_chunks)
-    ]
-    
-    """Validate if do reset is true delete all existing chunks for the project"""
-    if do_reset:
-        await chunk_model.delete_chunks_by_project(str(project.id))
 
-    inserted_count = await chunk_model.bulk_insert_data_chunks(file_chunks_records)
-    if not inserted_count:
-        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
-            "project_id": project_id, 
-            "file_id": file_id,
-            "inserted_count": inserted_count,
-            "message": ResponseStatus.FILE_PROCESSING_ERROR.value})
+    project_files_ids = []
+    if process_request.file_id:
+        project_files_ids= process_request.file_id
+    else:
+        asset_model = await AssetModel.create_instance(db_client=request.app.mongodb_client)
+        assets = await asset_model.get_all_assets_by_project(str(project.id) , AssetTypeEnum.File.value)
+        project_files_ids = [
+            asset["asset_name"]
+            for asset in assets]
+        # validate if file_id exists in the project
+        if not project_files_ids:
+            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"status": False, 
+                "project_id": project_id, 
+                "file_id": process_request.file_id,
+                "message": ResponseStatus.FILE_NOT_FOUND_IN_PROJECT.value})
+        inserted_chunks_count = 0
+        no_of_proccessed_files = 0
+        """Validate if do reset is true delete all existing chunks for the project"""
+        if do_reset:
+            await chunk_model.delete_chunks_by_project(str(project.id))
+        # Process each file associated with the project
+        for file_id in project_files_ids:
+            logger.info(f"Processing file: {file_id} in project {project_id}")
+            # Get file content
+            file_content = process_file_controller.get_document_content(file_id)
+            if not file_content:
+                ## TODO: Set Is Procced Flag to False in Asset
+                logger.error(f"File not found or could not be loaded: {file_id} in project {project_id}")
+                continue
+        # Process file into chunks
+        file_chunks = process_file_controller.process_file(file_content, chunk_size, overlap_size)
+        # Create DataChunk records
+        file_chunks_records = [ 
+            DataChunk(
+                    chunk_text=chunk.page_content,
+                    chunk_metadata= chunk.metadata,
+                    chunk_order= i+1,
+                    chunk_project_id=str(project.id)
+                )
+            for i, chunk in enumerate(file_chunks)
+        ]
+      
+        # Bulk insert chunks
+        inserted_chunks_count += await chunk_model.bulk_insert_data_chunks(file_chunks_records)
+        no_of_proccessed_files += 1
+        # If successfully inserted_count is 0 return error
+        if not inserted_chunks_count:
+            return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
+                "project_id": project_id, 
+                "file_id": file_id,
+                "inserted_chunks_count": inserted_chunks_count,
+                "no_of_proccessed_files": no_of_proccessed_files,
+                "message": ResponseStatus.FILE_PROCESSING_ERROR.value})
     
-    return {"status": True, "message": f"Processing file {file_id} for project {project_id} with chunk size {chunk_size}, overlap size {overlap_size}, reset={do_reset}" , "chunks_count": len(file_chunks), "chunks": file_chunks}
+    return {
+        "project_id": project_id, 
+        "file_id": file_id,
+        "inserted_chunks_count": inserted_chunks_count,
+        "no_of_proccessed_files": no_of_proccessed_files,
+        "message": ResponseStatus.FILE_PROCESSED_SUCCESS.value     
+    }
 

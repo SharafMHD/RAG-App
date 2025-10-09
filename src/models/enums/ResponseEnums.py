@@ -10,4 +10,5 @@ class ResponseStatus(str, Enum):
     FILE_TYPE_NOT_ALLOWED = "file type is not allowed"
     FILE_PROCESSING_ERROR = "file processing failed"
     FILE_PROCESSED_SUCCESS = "file processed successfully"
+    FILE_NOT_FOUND_IN_PROJECT = "file not found in the specified project"
     

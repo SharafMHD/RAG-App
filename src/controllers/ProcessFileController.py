@@ -20,7 +20,9 @@ class ProcessFileController(BaseController):
     def get_file_loader(self, file_id: str):
         file_extension = self.get_file_extension(file_id)
         file_path = os.path.join(self.project_path, file_id)
-
+        if not os.path.exists(file_path):
+            raise None
+        
         if file_extension == ProcessFileEnums.TXT.value:
             return TextLoader(file_path, encoding='utf-8')
         elif file_extension == ProcessFileEnums.PDF:
@@ -30,8 +32,10 @@ class ProcessFileController(BaseController):
     
     def get_document_content(self, file_id: str):
         loader = self.get_file_loader( file_id)
-        documents = loader.load()
-        return documents
+        if loader:
+            documents = loader.load()
+            return documents
+        return None
 
     def process_file(self, file_content: str, chunk_size: int=512000, overlap_size: int = 5120):
         text_splitter = RecursiveCharacterTextSplitter(

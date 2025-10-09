@@ -9,6 +9,27 @@ class ProjectDataModel(BaseDataModel):
         self.db = self.db_client[self.app_settings.MONGODB_DB_NAME]
         self.collection = self.db[DatabaseEnum.COLLECTION_PROJECTS_NAME.value]
 
+    @classmethod
+    async def create_instance(cls, db_client: object):
+        """Factory method to create an instance of ProjectDataModel and initialize the collection."""
+        instance = cls(db_client)
+        await instance.initialize_collection()
+        return instance 
+    
+    async def initialize_collection(self):
+        """Validate if project collection exists, if not create it."""
+        existing_collections = await self.db.list_collection_names()
+        if DatabaseEnum.COLLECTION_PROJECTS_NAME.value not in existing_collections:
+            await self.db.create_collection(DatabaseEnum.COLLECTION_PROJECTS_NAME.value)    
+
+        """Initialize the projects collection with necessary indexes."""
+        indexes = Project.get_indexes()
+        for index in indexes:
+            await self.collection.create_index(
+                index["key"], 
+                name=index["name"], 
+                unique=index["unique"])
+
     async def create_project(self, project_data: Project) -> Project:
         """Create a new project in the database."""
         result = await self.collection.insert_one(project_data.dict(by_alias=True,exclude_unset=True))

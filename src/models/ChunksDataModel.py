@@ -11,6 +11,28 @@ class ChunkDataModel(BaseDataModel):
         self.db = self.db_client[self.app_settings.MONGODB_DB_NAME]
         self.collection = self.db[DatabaseEnum.COLLECTION_DATA_CHUNKS_NAME.value]
 
+    @classmethod
+    async def create_instance(cls, db_client: object):
+        """Factory method to create an instance of ChunkDataModel and initialize the collection."""
+        instance = cls(db_client)
+        await instance.initialize_collection()
+        return instance 
+    
+    async def initialize_collection(self):
+        """Validate if Chunck collection exists, if not create it."""
+        existing_collections = await self.db.list_collection_names()
+        if DatabaseEnum.COLLECTION_DATA_CHUNKS_NAME.value not in existing_collections:
+            await self.db.create_collection(DatabaseEnum.COLLECTION_DATA_CHUNKS_NAME.value)    
+
+        """Initialize the projects collection with necessary indexes."""
+        indexes = DataChunk.get_indexes()
+        for index in indexes:
+            await self.collection.create_index(
+                index["key"], 
+                name=index["name"], 
+                unique=index["unique"])
+
+
     """Insert a new data chunk into the database."""
     async def insert_data_chunk(self, data_chunk: DataChunk) -> str:
         """Insert a new data chunk into the database."""

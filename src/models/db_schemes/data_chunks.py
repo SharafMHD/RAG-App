@@ -15,3 +15,14 @@ class DataChunk(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
+    """"Get indexes for the collection """
+    @classmethod
+    def get_indexes(cls):
+        return [
+                {
+                    "key": [("chunk_project_id", 1)],
+                    "name": "unique_chunk_project_id_index_1",
+                    "unique": False,
+                }
+            ]  # Unique index on project_id

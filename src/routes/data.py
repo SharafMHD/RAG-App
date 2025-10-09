@@ -18,7 +18,7 @@ data_router = APIRouter(
 )
 @data_router.post("/upload/{project_id}")
 async def upload_file(request:Request,project_id:str, file: UploadFile , app_settings: Settings=Depends(get_settings)):
-    project_model = ProjectDataModel(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
     new_project = await project_model.get_project_or_create(project_id)
     # validate file type and size
     controller = DataController()
@@ -41,7 +41,7 @@ async def upload_file(request:Request,project_id:str, file: UploadFile , app_set
         await file.close()
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
-            "project_id": project_id, 
+            "project_id": new_project.id, 
             "file_name": file.filename,
             "file_type": file.content_type, 
             "file_size": file.size, 
@@ -61,10 +61,10 @@ async def process_file(request:Request,project_id:str, process_request: ProcessR
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
 
-    project_model = ProjectDataModel(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
     project = await project_model.get_project_or_create(project_id)
 
-    chunk_model = ChunkDataModel(db_client=request.app.mongodb_client)
+    chunk_model =await  ChunkDataModel.create_instance(db_client=request.app.mongodb_client)
 
     process_file_controller = ProcessFileController(project_id)
     file_content = process_file_controller.get_document_content(file_id)

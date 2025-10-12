@@ -10,6 +10,7 @@ class DataChunk(BaseModel):
     chunk_metadata: Optional[dict] = None
     chunk_order: int = Field(..., gt=0)
     chunk_project_id: str = ObjectId
+    chunk_asset_id: ObjectId
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))  
 

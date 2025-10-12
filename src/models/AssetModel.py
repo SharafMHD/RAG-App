@@ -38,12 +38,21 @@ class AssetModel(BaseDataModel):
     
     async def get_all_assets_by_project(self, asset_project_id: str , asset_type:str) -> list[Assest]:
         """Retrieve all assets by its project_id."""
-        return await self.collection.find(
+        assets_files= await self.collection.find(
             {"asset_project_id": objectId(asset_project_id) if isinstance(asset_project_id , str) else asset_project_id ,
              "asset_type": asset_type}
             ).to_list(length=None)
+        return[
+            Assest(**asset) for asset in assets_files
+        ]
+    async def get_asset_by_name_and_projectid(self, asset_name: str , project_id) -> Assest | None:
+        """Retrieve an asset by its ID."""
+        asset_data = await self.collection.find_one({
+            "asset_name": asset_name,
+            "asset_project_id": objectId(project_id) if isinstance(project_id , str) else project_id
+        })
+        if asset_data:
+            return Assest(**asset_data)
+        return None
+        
     
-
-        """Delete a project from the database."""
-        result = await self.collection.delete_one({"project_id": project_id})
-        return result.deleted_count > 0

@@ -11,4 +11,8 @@ class ResponseStatus(str, Enum):
     FILE_PROCESSING_ERROR = "file processing failed"
     FILE_PROCESSED_SUCCESS = "file processed successfully"
     FILE_NOT_FOUND_IN_PROJECT = "file not found in the specified project"
+    PROJECT_NOT_FOUND_ERROR = "project not found"
+    NLP_INDEXING_SUCCESS = "NLP indexing completed successfully"
+    NLP_INDEXING_ERROR = "NLP indexing failed"
+
     

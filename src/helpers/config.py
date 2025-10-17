@@ -16,9 +16,30 @@ class Settings(BaseSettings):
 
     MONGODB_URL:str = "mongodb://localhost:27017"
     MONGODB_DB_NAME: str = "rag_app_db"
+
+    GENERATION_BACKEND: str
+    EMBEDDING_BACKEND: str
+
+    OPENAI_API_KEY: str = None
+    OPENAI_BASE_URL: str = None
+    COHERE_API_KEY: str =None
+
+    GENERATION_MODEL_ID: str =None
+    EMBEDDING_MODEL_ID: str =None
+    EMBEDDING_MODEL_SIZE:int = None
+
+    DEFAULT_INPUT_MAX_TOKENS :int = None
+    DEFAULT_OUTPUT_MAX_TOKENS :int = None
+    DEFAULT_GENERATION_TEMPERATURE:float = None
+
     # pydantic v2 style configuration for loading an env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+#================== Vector DB Settings ===============================
+    VECTOR_DB_BACKEND: str
+    VECTOR_DB_PATH:str= "qdrant_data"
+    VECTOR_DB_DISTANCE_METHOD:str=None
+    VECTOR_DBS_DIR: str = "assets/vector_dbs/"
 
 def get_settings() -> Settings:
     """Return a Settings instance.

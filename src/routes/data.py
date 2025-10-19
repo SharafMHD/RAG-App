@@ -131,7 +131,7 @@ async def process_file(request:Request,project_id:str, process_request: ProcessR
                 chunk_text=chunk.page_content,
                 chunk_metadata= chunk.metadata,
                 chunk_order= i+1,
-                chunk_project_id=str(project.id),
+                chunk_project_id=project.id,
                 chunk_asset_id=asset_id
             )
         for i, chunk in enumerate(file_chunks)

@@ -2,7 +2,7 @@ from .BaseController import BaseController
 from models.db_schemes import Project , DataChunk
 from stores.llm.LLMEnums import DocumentTypeEums
 from typing import List
-
+import json
 class NLPController(BaseController):
     def __init__(self,vector_db_client, generation_client,embedding_client):
         super().__init__()
@@ -21,12 +21,15 @@ class NLPController(BaseController):
             self.vector_db_client.delete_collection(collection_name)
         return collection_name
     
-    def get_vector_db_collection(self, project:Project):
+    def get_vector_db_collection_info(self, project:Project):
         collection_name = self.create_collection_name(str(project.id))
-        collection_info = self.vector_db_client.get_collection(collection_name)
-        return collection_info
+        collection_info = self.vector_db_client.get_collection_info(collection_name)
+        
+        return json.loads(
+                json.dumps(collection_info , default=lambda o: o.__dict__)
+            )
     
-    def index_into_vector_db(self, project:Project, data_chunks:List[DataChunk] , do_reset:bool=False):
+    def index_into_vector_db(self, project:Project, data_chunks:List[DataChunk] , do_reset:bool=False , chunk_ids:List[int]=[]):
         
         #Step 1: Get or create collection
         collection_name = self.create_collection_name(str(project.id))
@@ -53,7 +56,8 @@ class NLPController(BaseController):
             collection_name= collection_name,
             texts= texts,
             vectors= vectors,
-            metadata= metadata
+            metadata= metadata, 
+            record_ids= chunk_ids
         )
 
         return True

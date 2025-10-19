@@ -14,4 +14,5 @@ class ResponseStatus(str, Enum):
     PROJECT_NOT_FOUND_ERROR = "project not found"
     NLP_INDEXING_SUCCESS = "NLP indexing completed successfully"
     NLP_INDEXING_ERROR = "NLP indexing failed"
+    NLP_INDEX_INFO_SUCCESS = "NLP index information retrieved successfully"
     

@@ -17,7 +17,11 @@ from models.enums.AssetTypeEnum import AssetTypeEnum
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
     prefix="/api/v1/data",
+<<<<<<< HEAD
     tags=["api_v1" , "Data"],
+=======
+    tags=["Base" , "Data"],
+>>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
 )
 @data_router.post("/upload/{project_id}")
 async def upload_file(request:Request,project_id:str, file: UploadFile , app_settings: Settings=Depends(get_settings)):

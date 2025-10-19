@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     MONGODB_URL:str = "mongodb://localhost:27017"
     MONGODB_DB_NAME: str = "rag_app_db"
+<<<<<<< HEAD
 
     GENERATION_BACKEND: str
     EMBEDDING_BACKEND: str
@@ -40,6 +41,11 @@ class Settings(BaseSettings):
     VECTOR_DB_PATH:str= "qdrant_data"
     VECTOR_DB_DISTANCE_METHOD:str=None
     VECTOR_DBS_DIR: str = "assets/vector_dbs/"
+=======
+    # pydantic v2 style configuration for loading an env file
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+>>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
 
 def get_settings() -> Settings:
     """Return a Settings instance.

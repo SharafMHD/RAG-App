@@ -6,6 +6,7 @@ class BaseController:
     def __init__(self):
         self.app_settings = get_settings()
         self.base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+<<<<<<< HEAD
         self.file_dir = os.path.join(self.base_dir, self.app_settings.UPLOAD_DIR)
         self.vector_dbs_dir = os.path.join(self.file_dir, self.app_settings.VECTOR_DBS_DIR)
 
@@ -14,3 +15,6 @@ class BaseController:
         if not os.path.exists(databse_path):
             os.makedirs(databse_path , exist_ok=True)
         return databse_path
+=======
+        self.file_dir = os.path.join(self.base_dir, self.app_settings.UPLOAD_DIR)
+>>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199

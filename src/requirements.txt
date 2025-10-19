@@ -9,10 +9,13 @@ pymupdf4llm==0.0.27
 langchain-community==0.3.30
 motor==3.7.1
 openai==2.3.0
+<<<<<<< HEAD
 cohere==5.18.0
 qdrant-client==1.15.1
 
 
+=======
+>>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
 
 
 

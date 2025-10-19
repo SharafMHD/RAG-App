@@ -1,29 +1,19 @@
-<<<<<<< HEAD
 from ..LLMInterface import LLMInterface
 from openai import OpenAI
 from ..LLMEnums import LLMEnums , OPENAIEnums
-=======
 from ...LLMInterface import LLMInterface
 from openai import OpenAI
 from ...LLMEnums import LLMEnums , OPENAIEnums
->>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
 import logging
 
 class OpenAIProvider(LLMInterface):
     def __init__(self, api_key: str, 
-<<<<<<< HEAD
                  
         base_url: str = None,
         default_input_max_tokens: int=1000, 
         default_output_max_tokens:int=1000,
-        default_generation_temperature:float=0.1):
-=======
-                 base_url: str = None,
-                  default_input_max_tokens: int=1000, 
-                  default_output_max_tokens:int=1000,
-                  default_generation_temperature:float=0.1):
->>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
-        
+        default_generation_temperature:float=0.1):  
+     
         self.api_key= api_key
         self.base_url=base_url
         self.default_input_max_tokens = default_input_max_tokens
@@ -47,15 +37,9 @@ class OpenAIProvider(LLMInterface):
     def set_genration_model(self, model_id: str) :
         self.generation_model = model_id
     
-<<<<<<< HEAD
-    def set_embedding_model(self,model_id:str, embedding_model_size=int) :
-        self.set_embedding_model = model_id
+    def set_embedding_model(self,embedding_model_id:str, embedding_model_size=int) :
+        self.embedding_model = embedding_model_id
         self.embedd_size = embedding_model_size
-=======
-    def set_embedding_model(self,model_id:str, embedding_size=int) :
-        self.set_embedding_model = model_id
-        self.embedd_size = embedding_size
->>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
 
     def process_text(self, text:str):
         return text[:self.default_input_max_tokens].strip()

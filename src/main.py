@@ -1,16 +1,13 @@
 from fastapi import FastAPI
-<<<<<<< HEAD
 from routes import base , data, nlp
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 from stores.llm import LLMProvideFactory
 from stores.vectordb import VectorDBProviderFactory
-=======
 from routes import base , data
 from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 
->>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -18,12 +15,10 @@ async def lifespan(app: FastAPI):
     app_settings = get_settings()
     app.mongodb_client = AsyncIOMotorClient(app_settings.MONGODB_URL)
     app.mongodb = app.mongodb_client[app_settings.MONGODB_DB_NAME]
-<<<<<<< HEAD
 
     llm_provider_factory =LLMProvideFactory(app_settings)
     vectordb_provider_factory = VectorDBProviderFactory(app_settings)
     # Genration client
-
     app.generation_client= llm_provider_factory.create(provider=app_settings.GENERATION_BACKEND)
     app.generation_client.set_genration_model(app_settings.GENERATION_MODEL_ID)
     # Embedding client
@@ -38,12 +33,11 @@ async def lifespan(app: FastAPI):
     app.vector_db_client.disconnect()
 
 
-app = FastAPI(lifespan=lifespan)
-app.include_router(base.base_router)
-app.include_router(data.data_router)
-app.include_router(nlp.nlp_router)
+    app = FastAPI(lifespan=lifespan)
+    app.include_router(base.base_router)
+    app.include_router(data.data_router)
+    app.include_router(nlp.nlp_router)
 
-=======
     yield
     app.mongodb_client.close()
 
@@ -52,4 +46,3 @@ app = FastAPI(lifespan=lifespan)
 
 app.include_router(base.base_router)
 app.include_router(data.data_router)
->>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199

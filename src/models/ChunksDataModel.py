@@ -61,7 +61,6 @@ class ChunkDataModel(BaseDataModel):
             return DataChunk(**result)
         return None
     
-<<<<<<< HEAD
     """Delete Chunks by  project"""
     async def delete_chunks_by_project(self, project_id:object):
         result = await self.collection.delete_many({"chunk_project_id": project_id})
@@ -76,10 +75,8 @@ class ChunkDataModel(BaseDataModel):
             .to_list(length=page_size)
         data_chunks = [DataChunk(**result) for result in results]
         return data_chunks
-=======
         """Delete Chunks by  project"""
     async def delete_chunks_by_project(self, project_id:object):
         result = await self.collection.delete_many({"chunk_project_id": project_id})
         return result.deleted_count > 0 
->>>>>>> 8de40d89a2d595dc0d3af7aa0acc8d4c9e6b1199
     

@@ -84,11 +84,14 @@ class OpenAIProvider(LLMInterface):
             self.logger.error("Embedding model for OpenAI is not set")
             return None
         
+        # print(f"Using embedding model: {self.embedding_model}")
+        # print(f"Client type: {type(self.client)}")
+
         response = self.client.embeddings.create(
             model= self.embedding_model,
-            input=  text
+            input=  text,
         )
-    
+
         if not response or not response.data or len(response.data) ==0 or not response.data[0].embedding:
             self.logger.error("Error while embeding OpenAI.")
             return None

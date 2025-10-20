@@ -60,6 +60,7 @@ class QdrantDBProvider(VectorDBInterface):
                     distance=self.distance_method
                 )
             )
+            
             return True
         return False
     
@@ -121,6 +122,7 @@ class QdrantDBProvider(VectorDBInterface):
                 collection_name=collection_name,
                 records=batch_record
             )
+                print(f"Inserted batch starting at index {i}")
             except Exception as e:
                 self.looger.error(f"Error inserting batch starting at index {i}: {e}")
                 return False
@@ -129,8 +131,10 @@ class QdrantDBProvider(VectorDBInterface):
     
     def search_by_vector(self, collection_name: str, query_vector: list, limit: int =5):
 
-        return self.client.search(
+        search_results = self.client.search(
             collection_name=collection_name,
             query_vector=query_vector,
             limit=limit
         )
+        print(f"Search results: {query_vector}")
+        return search_results

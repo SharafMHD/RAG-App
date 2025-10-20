@@ -43,8 +43,7 @@ class NLPController(BaseController):
             self.embedding_client.embedd_text(text=text, document_type = DocumentTypeEums.DOCUMENT.value)
             for text in texts
         ]
-        
-        print(f"Prepared {len(vectors)} vectors for indexing.")  # Debug statement
+       
         #Step 3: create vector db records if not exist
         _ = self.vector_db_client.create_collection(
             collection_name= collection_name,
@@ -83,8 +82,6 @@ class NLPController(BaseController):
             limit= limit
         )
 
-        print(f"Vectors shape: {query_vector.shape}")  # Check the shape of the vectors array
-        print(f"Query shape: {search_results.shape}")  
         if not search_results:
             return False
         

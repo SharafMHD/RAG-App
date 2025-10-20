@@ -109,6 +109,8 @@ async def search_index(request:Request, project_id: str, search_request: SearchR
     # Implement search logic here
 
     results = nlp_controller.search_index(project=project , text=search_request.text , limit=search_request.limit)
+
+
     if not results:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
             "project_id": project_id, 

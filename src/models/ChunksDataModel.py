@@ -76,7 +76,6 @@ class ChunkDataModel(BaseDataModel):
             ).skip((page_no - 1) * page_size
             ).limit(page_size
             ).to_list(length=None)
-        print(project_id)
         data_chunks = [DataChunk(**result) for result in results]
         return data_chunks
     

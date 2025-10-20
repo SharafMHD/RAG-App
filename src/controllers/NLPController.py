@@ -43,7 +43,8 @@ class NLPController(BaseController):
             self.embedding_client.embedd_text(text=text, document_type = DocumentTypeEums.DOCUMENT.value)
             for text in texts
         ]
-
+        
+        print(f"Prepared {len(vectors)} vectors for indexing.")  # Debug statement
         #Step 3: create vector db records if not exist
         _ = self.vector_db_client.create_collection(
             collection_name= collection_name,
@@ -51,7 +52,6 @@ class NLPController(BaseController):
             do_reset= do_reset
         )
         #Step 4: Upsert into vector db
-
         _= self.vector_db_client.insert_many_vectors(
             collection_name= collection_name,
             texts= texts,
@@ -61,5 +61,36 @@ class NLPController(BaseController):
         )
 
         return True
+    
+    def search_index(self, project:Project, text: str, limit:int=5):
+         #Step 1: Get or create collection
+        collection_name = self.create_collection_name(str(project.id))
+
+        #Step 2: Prepare embedding for search text
+        query_vector = self.embedding_client.embedd_text(
+            text=text, 
+            document_type = DocumentTypeEums.QUERY.value
+        )
+
+        if not query_vector or len(query_vector) ==0:
+            return False
+        
+
+        #Step 3: Search in vector db
+        search_results = self.vector_db_client.search_by_vector(
+            collection_name= collection_name,
+            query_vector= query_vector,
+            limit= limit
+        )
+
+        print(f"Vectors shape: {query_vector.shape}")  # Check the shape of the vectors array
+        print(f"Query shape: {search_results.shape}")  
+        if not search_results:
+            return False
+        
+        return json.loads(
+                json.dumps(search_results , default=lambda o: o.__dict__)
+            )
+
 
        

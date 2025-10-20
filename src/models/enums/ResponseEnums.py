@@ -15,4 +15,6 @@ class ResponseStatus(str, Enum):
     NLP_INDEXING_SUCCESS = "NLP indexing completed successfully"
     NLP_INDEXING_ERROR = "NLP indexing failed"
     NLP_INDEX_INFO_SUCCESS = "NLP index information retrieved successfully"
+    NLP_INDEX_SEARCH_ERROR = "Failed to retrieve NLP index information"
+    NLP_INDEX_SEARCH_SUCCESS = "NLP search completed successfully"
     

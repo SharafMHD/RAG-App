@@ -123,6 +123,7 @@ class QdrantDBProvider(VectorDBInterface):
                 records=batch_record
             )
                 print(f"Inserted batch starting at index {i}")
+                
             except Exception as e:
                 self.looger.error(f"Error inserting batch starting at index {i}: {e}")
                 return False

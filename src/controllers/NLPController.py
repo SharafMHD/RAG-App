@@ -43,9 +43,8 @@ class NLPController(BaseController):
             self.embedding_client.embedd_text(text=text, document_type = DocumentTypeEums.DOCUMENT.value)
             for text in texts
         ]
-       
         #Step 3: create vector db records if not exist
-        _ = self.vector_db_client.create_collection(
+        collection_info = self.vector_db_client.create_collection(
             collection_name= collection_name,
             embedding_size= self.embedding_client.embedd_size,
             do_reset= do_reset
@@ -70,6 +69,8 @@ class NLPController(BaseController):
             text=text, 
             document_type = DocumentTypeEums.QUERY.value
         )
+
+        print(f"Query vector length: {len(query_vector)}")
 
         if not query_vector or len(query_vector) ==0:
             return False

@@ -70,8 +70,6 @@ class NLPController(BaseController):
             document_type = DocumentTypeEums.QUERY.value
         )
 
-        print(f"Query vector length: {len(query_vector)}")
-
         if not query_vector or len(query_vector) ==0:
             return False
         
@@ -86,9 +84,27 @@ class NLPController(BaseController):
         if not search_results:
             return False
         
-        return json.loads(
-                json.dumps(search_results , default=lambda o: o.__dict__)
-            )
+        return search_results
+    
+    def answer_rag_query(self, project:Project, query_text:str, limit:int=5):
+        #Step 1: Search index for relevant documents
+        search_results = self.search_index(
+            project= project,
+            text= query_text,
+            limit= limit
+        )
+
+        if not search_results or len(search_results) ==0:
+            return None
+        
+        #Step 2: Generate answer using generation client
+        context_documents = [ doc.text for doc in search_results ]
+        answer = self.generation_client.generate_answer(
+            query= query_text,
+            context_documents= context_documents
+        )
+
+        return answer
 
 
        

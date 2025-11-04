@@ -27,3 +27,7 @@ class DataChunk(BaseModel):
                     "unique": False,
                 }
             ]  # Unique index on project_id
+    
+class RetrievedDocuments(BaseModel):
+    text: str
+    score: float

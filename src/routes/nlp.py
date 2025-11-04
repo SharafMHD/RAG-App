@@ -118,5 +118,5 @@ async def search_index(request:Request, project_id: str, search_request: SearchR
     
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
         "project_id": project_id, 
-        "collection_info": results,
+        "results": [result.dict() for result in results],
         "message": ResponseStatus.NLP_INDEX_SEARCH_SUCCESS.value})

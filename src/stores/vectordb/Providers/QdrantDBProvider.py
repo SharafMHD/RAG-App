@@ -3,6 +3,7 @@ from ..VectorDBEnums import DistanceMethodEnums
 import logging
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+from models.db_schemes import RetrievedDocuments
 
 class QdrantDBProvider(VectorDBInterface):
     def __init__(self, db_path: str, distance_method: str) -> None:
@@ -158,7 +159,6 @@ class QdrantDBProvider(VectorDBInterface):
         return True
 
     def search_by_vector(self, collection_name: str, query_vector: list, limit: int = 5):
-        print(collection_name)
         if not self.is_collection_exists(collection_name):
             self.logger.error(f"Collection {collection_name} does not exist.")
             return []
@@ -166,7 +166,6 @@ class QdrantDBProvider(VectorDBInterface):
         info = self.get_collection_info(collection_name)
         vector_size = info.config.params.vectors.size
         if len(query_vector) != vector_size:
-            self.logger.error(f"Query vector size {len(query_vector)} does not match collection vector size {vector_size}")
             return []
 
         try:
@@ -175,12 +174,21 @@ class QdrantDBProvider(VectorDBInterface):
                 query_vector=query_vector,
                 limit=limit
             )
-            self.logger.info(f"Found {len(search_results)} results in collection {collection_name}")
-            return search_results
+            if not search_results or len(search_results) == 0:
+                return []
+            
+            return [
+                RetrievedDocuments(
+                    text=result.payload["text"],
+                    score=result.score
+                ) 
+                for result in search_results
+            ]
 
         except Exception as e:
             self.logger.error(f"Error searching vectors: {e}")
             return []
+        
     def list_collections(self) -> list:
         try:
             collections = self.client.get_collections()

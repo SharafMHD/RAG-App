@@ -17,4 +17,6 @@ class ResponseStatus(str, Enum):
     NLP_INDEX_INFO_SUCCESS = "NLP index information retrieved successfully"
     NLP_INDEX_SEARCH_ERROR = "Failed to retrieve NLP index information"
     NLP_INDEX_SEARCH_SUCCESS = "NLP search completed successfully"
+    NLP_RAG_ANSWER_ERROR = "Failed to generate RAG answer"
+    NLP_RAG_ANSWER_SUCCESS = "RAG answer generated successfully"
     

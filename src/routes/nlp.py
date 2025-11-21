@@ -104,7 +104,8 @@ async def search_index(request:Request, project_id: str, search_request: SearchR
     nlp_controller = NLPController(
         generation_client=request.app.generation_client,
         embedding_client=request.app.emedding_client,
-        vector_db_client=request.app.vector_db_client
+        vector_db_client=request.app.vector_db_client,
+        template_parser=request.app.template_parser
     )
     # Implement search logic here
 
@@ -120,3 +121,36 @@ async def search_index(request:Request, project_id: str, search_request: SearchR
         "project_id": project_id, 
         "results": [result.dict() for result in results],
         "message": ResponseStatus.NLP_INDEX_SEARCH_SUCCESS.value})
+    
+    
+@nlp_router.post("/index/answer/{project_id}")
+async def answer_rag(request:Request, project_id: str, search_request: SearchRequest):
+
+        # Initialize models
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
+    # Get or create project
+    project = await project_model.get_project_or_create(project_id)
+
+        # Initialize NLP Controller
+    nlp_controller = NLPController(
+        generation_client=request.app.generation_client,
+        embedding_client=request.app.emedding_client,
+        vector_db_client=request.app.vector_db_client,
+        template_parser=request.app.template_parser
+    )
+    answer, full_prompt, chat_history = nlp_controller.answer_rag_query(
+        project=project , 
+        query_text=search_request.text , 
+        limit=search_request.limit
+    )
+    if not answer:
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
+            "project_id": project_id, 
+            "message": ResponseStatus.NLP_RAG_ANSWER_ERROR.value})
+        
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
+        "project_id": project_id,
+        "answer": answer,
+        "full_prompt": full_prompt,
+        "chat_history": chat_history,
+        "message": ResponseStatus.NLP_RAG_ANSWER_SUCCESS.value})

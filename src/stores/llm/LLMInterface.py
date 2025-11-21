@@ -15,5 +15,5 @@ class LLMInterface(ABC):
     def embedd_text(self, text: str , document_type:str = None):
         pass
     @abstractmethod
-    def constract_prompt(self, prompt: str ,role:str):
+    def construct_prompt(self, prompt: str ,role:str):
         pass

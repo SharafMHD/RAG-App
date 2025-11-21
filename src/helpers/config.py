@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     VECTOR_DB_PATH:str= "qdrant_data"
     VECTOR_DB_DISTANCE_METHOD:str=None
     VECTOR_DBS_DIR: str = "assets/vector_dbs/"
+#================== Templates Settings ===============================
+    DEFAULT_LANGUAGE: str = "en"    
+    PRIMARY_LANGUAGE: str = "en"    
+    TEMPLATES_DIR: str = "templates"
     # pydantic v2 style configuration for loading an env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

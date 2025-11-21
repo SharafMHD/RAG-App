@@ -10,8 +10,8 @@ class OpenAIProvider(LLMInterface):
     def __init__(self, api_key: str, 
                  
         base_url: str = None,
-        default_input_max_tokens: int=1000, 
-        default_output_max_tokens:int=1000,
+        default_input_max_tokens: int=10000, 
+        default_output_max_tokens:int=10000,
         default_generation_temperature:float=0.1):  
      
         self.api_key= api_key
@@ -31,7 +31,7 @@ class OpenAIProvider(LLMInterface):
             api_key= self.api_key,
             base_url= self.base_url
         )
-
+        self.enums= OPENAIEnums
         self.logger = logging.getLogger(__name__)
     
     def set_genration_model(self, model_id: str) :
@@ -44,8 +44,7 @@ class OpenAIProvider(LLMInterface):
     def process_text(self, text:str):
         return text[:self.default_input_max_tokens].strip()
     
-    def generate_text(self, prompt: str,chat_history:list=[],  max_output_tokens: int = None, 
-                      temperature: float=None) :
+    def generate_text(self, prompt: str,chat_history:list=[],  max_output_tokens: int = None, temperature: float=None) :
         
         if not self.client:
             self.logger.error("OpenAI client was not set.")
@@ -57,23 +56,23 @@ class OpenAIProvider(LLMInterface):
         
         if max_output_tokens == max_output_tokens : self.default_output_max_tokens
         if temperature == temperature : self.default_generation_temperature
-
         chat_history.append(
-            self.constract_prompt(prompt=prompt,role=OPENAIEnums.USER.value)
+            self.construct_prompt(prompt=prompt,role=OPENAIEnums.USER.value)
         )
-
+        print("chat_history",chat_history)
         response = self.client.chat.completions.create(
             model= self.generation_model,
             messages= chat_history,
             max_tokens= max_output_tokens,
             temperature= temperature
         )
-
+        ##print(chat_history)
         if not response or not response.choices or len(response.choices) ==0 or not response.choices[0].message :
-            self.logger.error("Error while genration text with OPENAI")
+            self.logger.error("Error while generation text with OPENAI")
             return None
         
-        return response.choices[0].message["content"]
+        # Use dot notation instead of subscript for ChatCompletionMessage object
+        return response.choices[0].message.content
     
     def embedd_text(self, text: str , document_type:str =None):
         if not self.client:
@@ -98,7 +97,7 @@ class OpenAIProvider(LLMInterface):
 
         return response.data[0].embedding
     
-    def constract_prompt(self, prompt: str ,role:str):
+    def construct_prompt(self, prompt: str ,role:str):
         return {
             "role" : role,
             "content": self.process_text(prompt)

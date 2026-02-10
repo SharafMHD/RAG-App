@@ -6,12 +6,19 @@ from stores.llm import LLMProvideFactory
 from stores.vectordb import VectorDBProviderFactory
 from contextlib import asynccontextmanager
 from stores.llm.Templates.template_parser import TemplateParser
+from sqlalchemy.ext.asyncio import create_async_engine , AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app_settings = get_settings()
-    app.mongodb_client = AsyncIOMotorClient(app_settings.MONGODB_URL)
-    app.mongodb = app.mongodb_client[app_settings.MONGODB_DB_NAME]
+    postgres_conn = f"postgresql+asyncpg://{app_settings.POSTGRESQL_USER}:{app_settings.POSTGRESQL_PASSWORD}@{app_settings.POSTGRESQL_HOST}:{app_settings.POSTGRESQL_PORT}/{app_settings.POSTGRESQL_DB_NAME}"
+    app.db_engine = create_async_engine(postgres_conn, echo=True)
+    
+    app.db_client = sessionmaker(
+        bind=app.db_engine,
+        class_=AsyncSession,
+        expire_on_commit=False)
 
     llm_provider_factory = LLMProvideFactory(app_settings)
     vectordb_provider_factory = VectorDBProviderFactory(app_settings)
@@ -34,9 +41,8 @@ async def lifespan(app: FastAPI):
     
     yield
 
-    app.mongodb_client.close()
+    app.db_engine.dispose()
     app.vector_db_client.disconnect()
-
 
 
 # ✅ Correct place to create the app

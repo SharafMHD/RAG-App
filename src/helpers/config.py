@@ -14,8 +14,15 @@ class Settings(BaseSettings):
     FILE_DEFAULT_CHUNK_SIZE: int = 512000 # in kb
     FILE_OVERLAP_SIZE: int = 5120 # in kbs
 
-    MONGODB_URL:str = "mongodb://localhost:27017"
-    MONGODB_DB_NAME: str = "rag_app_db"
+    # MONGODB_URL:str = "mongodb://localhost:27017"
+    # MONGODB_DB_NAME: str = "rag_app_db"
+    
+    # PostgreSQL Database config
+    POSTGRESQL_HOST: str = "localhost"
+    POSTGRESQL_PORT: int = 5432
+    POSTGRESQL_DB_NAME: str = "rag_app_db"
+    POSTGRESQL_USER: str = "postgres"
+    POSTGRESQL_PASSWORD: str = "admin"  
 
     GENERATION_BACKEND: str
     EMBEDDING_BACKEND: str

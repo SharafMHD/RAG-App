@@ -5,3 +5,8 @@ class ProcessRequest(BaseModel):
     chunk_size: Optional[int] = 512000  # Default chunk size in bytes
     overlap_size: Optional[int] = 5120  # Default overlap size in bytes
     do_reset: Optional[bool] = False
+
+class ProjectData(BaseModel):  
+    project_name: str
+    description: Optional[str] = None
+    owner: Optional[str] = None

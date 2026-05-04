@@ -7,6 +7,7 @@ from models.ProjectDataModel import ProjectDataModel
 from models.ChunksDataModel import ChunkDataModel
 from models import ResponseStatus
 from controllers import NLPController
+from uuid import UUID
 
 logger = logging.getLogger("uvicorn.error")
 nlp_router = APIRouter(
@@ -15,10 +16,10 @@ nlp_router = APIRouter(
 )
 
 @nlp_router.post("/index/push/{project_id}")
-async def index_project(request:Request, project_id:str, push_request: PushRequest , app_settings: Settings=Depends(get_settings)):
+async def index_project(request:Request, project_id:UUID, push_request: PushRequest , app_settings: Settings=Depends(get_settings)):
     # Initialize models
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
-    chunck_model = await ChunkDataModel.create_instance(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
+    chunck_model = await ChunkDataModel.create_instance(db_client=request.app.db_client)
     # Get or create project
     project = await project_model.get_project_or_create(project_id)
 
@@ -42,7 +43,7 @@ async def index_project(request:Request, project_id:str, push_request: PushReque
     )
     # Retrieve data chunks for the project
     while has_records:
-        page_chunks = await chunck_model.get_data_chunks_by_project(project.id, page_no)
+        page_chunks = await chunck_model.get_data_chunks_by_project(project.project_id, page_no)
 
         if len(page_chunks):
            page_no += 1
@@ -73,10 +74,10 @@ async def index_project(request:Request, project_id:str, push_request: PushReque
                 "message": ResponseStatus.NLP_INDEXING_ERROR.value})
 
 @nlp_router.get("/index/info/{project_id}")
-async def get_index_info(request:Request, project_id: str):
+async def get_index_info(request:Request, project_id: UUID):
 
     # Initialize models
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     # Get or create project
     project = await project_model.get_project_or_create(project_id)
 
@@ -95,10 +96,10 @@ async def get_index_info(request:Request, project_id: str):
         "message": ResponseStatus.NLP_INDEX_INFO_SUCCESS.value})
 
 @nlp_router.post("/index/search/{project_id}")
-async def search_index(request:Request, project_id: str, search_request: SearchRequest):
+async def search_index(request:Request, project_id: UUID, search_request: SearchRequest):
 
         # Initialize models
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     # Get or create project
     project = await project_model.get_project_or_create(project_id)
 
@@ -126,10 +127,10 @@ async def search_index(request:Request, project_id: str, search_request: SearchR
     
     
 @nlp_router.post("/index/answer/{project_id}")
-async def answer_rag(request:Request, project_id: str, search_request: SearchRequest):
+async def answer_rag(request:Request, project_id: UUID, search_request: SearchRequest):
 
         # Initialize models
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     # Get or create project
     project = await project_model.get_project_or_create(project_id)
 

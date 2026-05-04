@@ -1,58 +1,58 @@
 
+
 from .BaseDataModel import BaseDataModel
-from .db_schemes import Assest
+from .db_schemes import Asset
 from .enums.DatabaseEnum import DatabaseEnum
 from bson import ObjectId as objectId
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import select, delete
 class AssetModel(BaseDataModel):
     def __init__(self, db_client: object):
         super().__init__(db_client)
-        self.db = self.db_client[self.app_settings.MONGODB_DB_NAME]
-        self.collection = self.db[DatabaseEnum.COLLECTION_ASSET_NAME.value]
+        self.db_client = db_client
+
 
     @classmethod
     async def create_instance(cls, db_client: object):
         """Factory method to create an instance of ASSETMODEL and initialize the collection."""
         instance = cls(db_client)
-        await instance.initialize_collection()
         return instance 
     
-    async def initialize_collection(self):
-        """Validate if ASSET collection exists, if not create it."""
-        existing_collections = await self.db.list_collection_names()
-        if DatabaseEnum.COLLECTION_ASSET_NAME.value not in existing_collections:
-            await self.db.create_collection(DatabaseEnum.COLLECTION_ASSET_NAME.value)    
 
-        """Initialize the projects collection with necessary indexes."""
-        indexes = Assest.get_indexes()
-        for index in indexes:
-            await self.collection.create_index(
-                index["key"], 
-                name=index["name"], 
-                unique=index["unique"])
-
-    async def create_asset(self, asset: Assest) -> Assest:
+    async def create_asset(self, asset: Asset) -> Asset:
         """Create a new Asset in the database."""
-        result = await self.collection.insert_one(asset.dict(by_alias=True,exclude_unset=True))
-        asset.id = result.inserted_id
+        async with self.db_client() as session:
+            async with session.begin():
+                session.add(asset)
+            await session.commit()
+            await session.refresh(asset)
         return asset
     
-    async def get_all_assets_by_project(self, asset_project_id: str , asset_type:str) -> list[Assest]:
+    async def get_all_assets_by_project(self, asset_project_id: UUID, asset_type: str) -> list[Asset]:
         """Retrieve all assets by its project_id."""
-        assets_files= await self.collection.find(
-            {"asset_project_id": objectId(asset_project_id) if isinstance(asset_project_id , str) else asset_project_id ,
-             "asset_type": asset_type}
-            ).to_list(length=None)
-        return[
-            Assest(**asset) for asset in assets_files
-        ]
-    async def get_asset_by_name_and_projectid(self, asset_name: str , project_id) -> Assest | None:
+        async with self.db_client() as session:
+            # 1. Define the statement
+            stmt = select(Asset).where(
+                Asset.asset_project_id == asset_project_id,
+                Asset.asset_type == asset_type
+            )
+            
+            # 2. Execute and extract scalars in one go
+            result = await session.execute(stmt)
+            assets_files = result.scalars().all()
+            
+        return assets_files
+
+
+    async def get_asset_by_name_and_projectid(self, asset_name: str , project_id: UUID) -> Asset | None:
         """Retrieve an asset by its ID."""
-        asset_data = await self.collection.find_one({
-            "asset_name": asset_name,
-            "asset_project_id": objectId(project_id) if isinstance(project_id , str) else project_id
-        })
-        if asset_data:
-            return Assest(**asset_data)
-        return None
+        async with self.db_client() as session:
+            async with session.begin():
+                await session.execute(select(Asset).where(
+                    Asset.asset_name == asset_name,
+                    Asset.asset_project_id == project_id
+                ))
+                asset_file = session.scalar_one_or_none()
+        return asset_file
         
     

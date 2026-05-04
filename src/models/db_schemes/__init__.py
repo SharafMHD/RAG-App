@@ -1,3 +1,1 @@
-from .project import Project
-from .data_chunks import DataChunk, RetrievedDocuments
-from .asset import Assest
+from models.db_schemes.rag_app_db.schemes import Project,Asset ,DataChunk, RetrievedDocuments

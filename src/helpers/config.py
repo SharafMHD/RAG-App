@@ -18,11 +18,11 @@ class Settings(BaseSettings):
     # MONGODB_DB_NAME: str = "rag_app_db"
     
     # PostgreSQL Database config
-    POSTGRESQL_HOST: str = "localhost"
-    POSTGRESQL_PORT: int = 5432
-    POSTGRESQL_DB_NAME: str = "rag_app_db"
-    POSTGRESQL_USER: str = "postgres"
-    POSTGRESQL_PASSWORD: str = "admin"  
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_MAIN_DB: str = "rag_app_db"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "admin"  
 
     GENERATION_BACKEND: str
     EMBEDDING_BACKEND: str

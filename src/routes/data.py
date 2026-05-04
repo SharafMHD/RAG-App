@@ -6,11 +6,12 @@ from controllers import DataController , ProcessFileController
 import logging
 import aiofiles
 import os
-from routes.schemes.data import ProcessRequest
+from uuid import UUID
+from routes.schemes.data import ProcessRequest ,ProjectData
 from models.ProjectDataModel import ProjectDataModel
 from models.ChunksDataModel import ChunkDataModel
 from models.AssetModel import AssetModel
-from models.db_schemes import DataChunk , Assest
+from models.db_schemes import Project , Asset ,DataChunk
 from models.enums.AssetTypeEnum import AssetTypeEnum
 
 
@@ -19,9 +20,41 @@ data_router = APIRouter(
         prefix="/api/v1/data",
         tags=["api_v1" , "Data"],
     )
+
+@data_router.post("/projects/create")
+async def create_project(request:Request, project_data: ProjectData):
+    print(f"Creating project with name: {project_data.project_name}, description: {project_data.description}, owner: {project_data.owner}")
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
+    Projectobject = Project(    
+        project_name= project_data.project_name,
+        description= project_data.description,
+        owner= project_data.owner
+    )
+    new_project = await project_model.create_project(project_data=Projectobject)
+    if new_project:
+         return JSONResponse(
+        status_code=status.HTTP_201_CREATED, 
+        content={
+            "status": True, 
+            # Convert UUID to string here
+            "project_id": str(new_project.project_id), 
+            "project_name": new_project.project_name, 
+            "description": new_project.description, 
+            "owner": new_project.owner,
+            "message": ResponseStatus.PROJECT_CREATED_SUCCESS.value
+        }
+    )
+    else:
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
+            "project_name": project_data.project_name, 
+            "description": project_data.description, 
+            "owner": project_data.owner,
+            "message": ResponseStatus.PROJECT_CREATED_ERROR.value})
+
 @data_router.post("/upload/{project_id}")
-async def upload_file(request:Request,project_id:str, file: UploadFile , app_settings: Settings=Depends(get_settings)):
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
+async def upload_file(request:Request,project_id: UUID, file: UploadFile , app_settings: Settings=Depends(get_settings)):
+    print(f"Received file: {file.filename}, content type: {file.content_type}, size: {file.size} bytes for project_id: {project_id}")
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     new_project = await project_model.get_project_or_create(project_id)
     # validate file type and size
     controller = DataController()
@@ -44,19 +77,20 @@ async def upload_file(request:Request,project_id:str, file: UploadFile , app_set
         await file.close()
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
-            "project_id": new_project.id, 
+            "project_id": new_project.project_id, 
             "file_name": file.filename,
             "file_type": file.content_type, 
             "file_size": file.size, 
             "message": ResponseStatus.FILE_UPLOAD_ERROR.value})
 
     # Store Asset metadata in the database
-    asset_model = await AssetModel.create_instance(db_client=request.app.mongodb_client)
-    asset_resource = Assest(
-            asset_project_id= new_project.id,
+    asset_model = await AssetModel.create_instance(db_client=request.app.db_client)
+    print(f"Storing asset metadata for file: {file.filename}, project_id: {project_id}, file_path: {file_path}. file_size: {os.path.getsize(file_path)} bytes")
+    asset_resource = Asset(
+            asset_project_id= new_project.project_id,
             asset_name= file_id,
             asset_type= AssetTypeEnum.File.value,
-            asset_szie = os.path.getsize(file_path)
+            asset_size = os.path.getsize(file_path)
             )
     asset_record= await asset_model.create_asset(asset_resource)
 
@@ -65,28 +99,28 @@ async def upload_file(request:Request,project_id:str, file: UploadFile , app_set
         "file_type": file.content_type, 
         "file_size": file.size, 
         "file_id": file_id,
-        "asset_id": str(asset_record.id),
+        "asset_id": str(asset_record.asset_id),
         "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
 
 @data_router.post("/processfile/{project_id}")
-async def process_file(request:Request,project_id:str, process_request: ProcessRequest):
+async def process_file(request:Request,project_id: UUID, process_request: ProcessRequest):
    
    # file_id = process_request.file_id
     chunk_size = process_request.chunk_size
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
 
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.mongodb_client)
+    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     project = await project_model.get_project_or_create(project_id)
 
-    chunk_model =await  ChunkDataModel.create_instance(db_client=request.app.mongodb_client)
+    chunk_model =await  ChunkDataModel.create_instance(db_client=request.app.db_client)
 
     process_file_controller = ProcessFileController(project_id)
-    asset_model = await AssetModel.create_instance(db_client=request.app.mongodb_client)
+    asset_model = await AssetModel.create_instance(db_client=request.app.db_client)
 
     project_files_ids = {}
     if process_request.file_id:
-        asset_recrod= await asset_model.get_asset_by_name_and_projectid(process_request.file_id,project.id)
+        asset_recrod= await asset_model.get_asset_by_name_and_projectid(process_request.file_id,project.project_id)
         if not asset_recrod:
             return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"status": False, 
                 "project_id": project_id, 
@@ -94,13 +128,13 @@ async def process_file(request:Request,project_id:str, process_request: ProcessR
                 "message": ResponseStatus.FILE_NOT_FOUND_IN_PROJECT.value})
         
         project_files_ids= {
-            asset_recrod.id: asset_recrod.asset_name
+            asset_recrod.asset_id: asset_recrod.asset_name
         }
 
     else:
-        assets = await asset_model.get_all_assets_by_project(str(project.id) , AssetTypeEnum.File.value)
+        assets = await asset_model.get_all_assets_by_project(project.project_id, AssetTypeEnum.File.value)
         project_files_ids = {
-            asset.id: asset.asset_name
+            asset.asset_id: asset.asset_name
             for asset in assets
             }
     # validate if file_id exists in the project
@@ -113,7 +147,7 @@ async def process_file(request:Request,project_id:str, process_request: ProcessR
     no_of_proccessed_files = 0
     """Validate if do reset is true delete all existing chunks for the project"""
     if do_reset:
-        await chunk_model.delete_chunks_by_project(str(project.id))
+        await chunk_model.delete_chunks_by_project(str(project.project_id))
     # Process each file associated with the project
     for asset_id,file_id in project_files_ids.items():
         logger.info(f"Processing file: {asset_id,file_id} in project {project_id}")
@@ -128,10 +162,10 @@ async def process_file(request:Request,project_id:str, process_request: ProcessR
     # Create DataChunk records
     file_chunks_records = [ 
         DataChunk(
-                chunk_text=chunk.page_content,
+                chunk_content=chunk.page_content,
                 chunk_metadata= chunk.metadata,
                 chunk_order= i+1,
-                chunk_project_id=project.id,
+                chunk_project_id=project.project_id,
                 chunk_asset_id=asset_id
             )
         for i, chunk in enumerate(file_chunks)

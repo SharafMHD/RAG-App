@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from routes import base, data, nlp
-from motor.motor_asyncio import AsyncIOMotorClient
 from helpers.config import get_settings
 from stores.llm import LLMProvideFactory
 from stores.vectordb import VectorDBProviderFactory
@@ -12,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app_settings = get_settings()
-    postgres_conn = f"postgresql+asyncpg://{app_settings.POSTGRESQL_USER}:{app_settings.POSTGRESQL_PASSWORD}@{app_settings.POSTGRESQL_HOST}:{app_settings.POSTGRESQL_PORT}/{app_settings.POSTGRESQL_DB_NAME}"
+    postgres_conn = f"postgresql+asyncpg://{app_settings.POSTGRES_USER}:{app_settings.POSTGRES_PASSWORD}@{app_settings.POSTGRES_HOST}:{app_settings.POSTGRES_PORT}/{app_settings.POSTGRES_MAIN_DB}"
     app.db_engine = create_async_engine(postgres_conn, echo=True)
     
     app.db_client = sessionmaker(
@@ -45,10 +44,10 @@ async def lifespan(app: FastAPI):
     app.vector_db_client.disconnect()
 
 
-# ✅ Correct place to create the app
+#  Correct place to create the app
 app = FastAPI(lifespan=lifespan)
 
-# ✅ Register all routers here
+#  Register all routers here
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(nlp.nlp_router)

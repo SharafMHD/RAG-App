@@ -1,6 +1,7 @@
 from .BaseController import BaseController
 from .ProjectController import ProjectController
 import os
+from sqlalchemy.dialects.postgresql import UUID
 from models.enums.ProcessFileEnums import ProcessFileEnums
 #from langchain.document_loaders import TextLoader, PyMuPDFLoader
 from langchain_community.document_loaders import TextLoader,PyMuPDFLoader
@@ -8,7 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 class ProcessFileController(BaseController):
 
-    def __init__(self , project_id: str):
+    def __init__(self , project_id: UUID):
         super().__init__()
         self.project_controller = ProjectController()
         self.project_id = project_id

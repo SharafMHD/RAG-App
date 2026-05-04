@@ -16,7 +16,7 @@ class DataController(BaseController):
             return False , ResponseStatus.FILE_SZIE_EXCEEDS.value
         return True , "file is valid"
     
-    def generate_unique_filepath(self, original_filename: str, project_id:str) -> str:
+    def generate_unique_filepath(self, original_filename: str, project_id:uuid) -> str:
         extension = os.path.splitext(original_filename)[1]
         unique_name = f"{uuid.uuid4()}"
         # Use an instance of ProjectController (get_project_path is an instance method)

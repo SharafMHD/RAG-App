@@ -2,6 +2,7 @@ from .BaseController import BaseController
 from models.db_schemes import Project , DataChunk
 from stores.llm.LLMEnums import DocumentTypeEums
 from typing import List
+from uuid import UUID
 import json
 class NLPController(BaseController):
     def __init__(self,vector_db_client, generation_client,embedding_client, template_parser):
@@ -12,18 +13,18 @@ class NLPController(BaseController):
         self.embedding_client = embedding_client
         self.template_parser = template_parser
 
-    def create_collection_name(self, project_id:str):
+    def create_collection_name(self, project_id:UUID):
         collection_name = f"collection_{project_id}".strip().replace(" ","_").lower()
         return collection_name
     
     def reset_vector_db_collection(self, project:Project):
-        collection_name = self.create_collection_name(str(project.id))
+        collection_name = self.create_collection_name(str(project.project_id))
         if self.vector_db_client.collection_exists(collection_name):
             self.vector_db_client.delete_collection(collection_name)
         return collection_name
     
     def get_vector_db_collection_info(self, project:Project):
-        collection_name = self.create_collection_name(str(project.id))
+        collection_name = self.create_collection_name(str(project.project_id))
         collection_info = self.vector_db_client.get_collection_info(collection_name)
         
         return json.loads(
@@ -33,11 +34,11 @@ class NLPController(BaseController):
     def index_into_vector_db(self, project:Project, data_chunks:List[DataChunk] , do_reset:bool=False , chunk_ids:List[int]=[]):
         
         #Step 1: Get or create collection
-        collection_name = self.create_collection_name(str(project.id))
+        collection_name = self.create_collection_name(str(project.project_id))
 
         #step 2: Prepare embeddings
 
-        texts = [ chunk.chunk_text for chunk in data_chunks ]
+        texts = [ chunk.chunk_content for chunk in data_chunks ]
         metadata = [ chunk.chunk_metadata for chunk in data_chunks ]
 
         vectors =[
@@ -63,7 +64,7 @@ class NLPController(BaseController):
     
     def search_index(self, project:Project, text: str, limit:int=5):
          #Step 1: Get or create collection
-        collection_name = self.create_collection_name(str(project.id))
+        collection_name = self.create_collection_name(str(project.project_id))
 
         #Step 2: Prepare embedding for search text
         query_vector = self.embedding_client.embedd_text(
@@ -106,7 +107,7 @@ class NLPController(BaseController):
         documents_prompts = "\n".join([
             self.template_parser.get_template_module("rag", "document_prompt", {
                     "doc_num": idx + 1,
-                    "chunk_text": doc.text,
+                    "chunk_text": self.generation_client.process_text(doc.text),
             })
             for idx, doc in enumerate(retrieved_documents)
         ])

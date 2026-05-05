@@ -65,12 +65,12 @@ async def index_project(request:Request, project_id:UUID, push_request: PushRequ
         if is_indexed:
             indexed_chunks_count += len(page_chunks)
             return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
-                "project_id": project_id, 
+                "project_id": str(project_id), 
                 "indexed_chunks_count": indexed_chunks_count,
                 "message": ResponseStatus.NLP_INDEXING_SUCCESS.value})
         else:
             return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
-                "project_id": project_id, 
+                "project_id": str(project_id), 
                 "message": ResponseStatus.NLP_INDEXING_ERROR.value})
 
 @nlp_router.get("/index/info/{project_id}")
@@ -91,7 +91,7 @@ async def get_index_info(request:Request, project_id: UUID):
 
     collection_info = nlp_controller.get_vector_db_collection_info(project=project)
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
-        "project_id": project_id, 
+        "project_id": str(project_id), 
         "collection_info": collection_info,
         "message": ResponseStatus.NLP_INDEX_INFO_SUCCESS.value})
 
@@ -121,7 +121,7 @@ async def search_index(request:Request, project_id: UUID, search_request: Search
             "message": ResponseStatus.NLP_INDEX_SEARCH_ERROR.value})
     
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
-        "project_id": project_id, 
+        "project_id": str(project_id), 
         "results": [result.dict() for result in results],
         "message": ResponseStatus.NLP_INDEX_SEARCH_SUCCESS.value})
     
@@ -152,7 +152,7 @@ async def answer_rag(request:Request, project_id: UUID, search_request: SearchRe
             "message": ResponseStatus.NLP_RAG_ANSWER_ERROR.value})
         
     return JSONResponse(status_code=status.HTTP_200_OK, content={"status": True, 
-        "project_id": project_id,
+        "project_id": str(project_id),
         "answer": answer,
         "full_prompt": full_prompt,
         "chat_history": chat_history,

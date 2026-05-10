@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+from typing import List
 
 class Settings(BaseSettings):
     # Provide reasonable defaults for development to avoid startup failures
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = None
     COHERE_API_KEY: str =None
 
+    # GENERATION_MODEL_ID_LITRAL: List[str] = None
     GENERATION_MODEL_ID: str =None
     EMBEDDING_MODEL_ID: str =None
     EMBEDDING_MODEL_SIZE:int = None
@@ -40,10 +41,12 @@ class Settings(BaseSettings):
     DEFAULT_GENERATION_TEMPERATURE:float = None
 
 #================== Vector DB Settings ===============================
+    # VECTOR_DB_BACKEND_LITERAL: List[str] = None
     VECTOR_DB_BACKEND: str
     VECTOR_DB_PATH:str= "qdrant_data"
     VECTOR_DB_DISTANCE_METHOD:str=None
     VECTOR_DBS_DIR: str = "assets/vector_dbs/"
+    PGVECTOR_INDEX_THREADHOLD: int = 1000
 #================== Templates Settings ===============================
     DEFAULT_LANGUAGE: str = "en"    
     PRIMARY_LANGUAGE: str = "en"    

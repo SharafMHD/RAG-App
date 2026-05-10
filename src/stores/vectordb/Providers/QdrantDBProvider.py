@@ -6,49 +6,52 @@ from qdrant_client.http import models
 from models.db_schemes import RetrievedDocuments
 
 class QdrantDBProvider(VectorDBInterface):
-    def __init__(self, db_path: str, distance_method: str) -> None:
+    def __init__(self, db_client: str, default_vector_size: int=786, 
+                                    default_distance_method: str=None, index_threadhold: int = 1000) -> None:
         self.client = None
-        self.db_path = db_path
-        self.distance_method = None
+        self.db_client = db_client
+        self.default_distance_method = None
+        self.default_vector_size = default_vector_size
 
-        if distance_method == DistanceMethodEnums.COSINE.value:
+        if default_distance_method == DistanceMethodEnums.COSINE.value:
             self.distance_method = models.Distance.COSINE
-        elif distance_method == DistanceMethodEnums.EUCLIDEAN.value:
+        elif default_distance_method == DistanceMethodEnums.EUCLIDEAN.value:
             self.distance_method = models.Distance.EUCLIDEAN
-        elif distance_method == DistanceMethodEnums.DOT.value:
+        elif default_distance_method == DistanceMethodEnums.DOT.value:
             self.distance_method = models.Distance.DOT
         else:
-            logging.error(f"Unsupported distance method: {distance_method}")
-            raise ValueError(f"Unsupported distance method: {distance_method}")
+            logging.error(f"Unsupported distance method: {default_distance_method}")
+            raise ValueError(f"Unsupported distance method: {default_distance_method}")
 
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("uvicorn")
 
-    def connect(self) -> bool:
+
+    async def connect(self) -> bool:
         try:
-            self.client = QdrantClient(path=self.db_path)
+            self.client = QdrantClient(path=self.db_client)
             return True
         except Exception as e:
             self.logger.error(f"Error connecting to QdrantDB: {e}")
             return False
 
-    def disconnect(self):
+    async def disconnect(self):
         self.client = None
         raise NotImplementedError("Disconnect method is not required for QdrantDB local instance.")
 
-    def is_collection_exists(self, collection_name: str) -> bool:
+    async def is_collection_exists(self, collection_name: str) -> bool:
         return self.client.collection_exists(collection_name)
 
-    def get_collection_info(self, collection_name: str):
+    async def get_collection_info(self, collection_name: str):
         return self.client.get_collection(collection_name)
 
-    def drop_collection(self, collection_name: str):
-        if self.is_collection_exists(collection_name):
+    async def drop_collection(self, collection_name: str):
+        if await self.is_collection_exists(collection_name):
             self.client.delete_collection(collection_name)
             self.logger.info(f"Dropped collection: {collection_name}")
         else:
             self.logger.info(f"Collection {collection_name} does not exist.")
 
-    def create_collection(self, collection_name: str, embedding_size: int, do_reset: bool = False):
+    async def create_collection(self, collection_name: str, embedding_size: int, do_reset: bool = False):
         # Check if collection exists and matches embedding size
         if self.is_collection_exists(collection_name):
             info = self.get_collection_info(collection_name)
@@ -66,6 +69,7 @@ class QdrantDBProvider(VectorDBInterface):
                     return False
 
         if not self.is_collection_exists(collection_name) or do_reset:
+            self.logger.info(f"Creating Qdrant collection '{collection_name}' with vector size {embedding_size} and distance method {self.distance_method}")
             self.client.create_collection(
                 collection_name=collection_name,
                 vectors_config=models.VectorParams(
@@ -86,7 +90,7 @@ class QdrantDBProvider(VectorDBInterface):
 
         return False
 
-    def insert_one_vector(self, collection_name: str, text: str, vector: list, record_id: int = None, metadata: dict = None):
+    async def insert_one_vector(self, collection_name: str, text: str, vector: list, record_id: int = None, metadata: dict = None):
         if not self.is_collection_exists(collection_name):
             self.logger.error(f"Collection {collection_name} does not exist.")
             return False
@@ -115,7 +119,7 @@ class QdrantDBProvider(VectorDBInterface):
             self.logger.error(f"Error inserting vector: {e}")
             return False
 
-    def insert_many_vectors(self, collection_name: str, texts: list, vectors: list, metadata: list = None, record_ids: list = None, batch_size: int = 100):
+    async def insert_many_vectors(self, collection_name: str, texts: list, vectors: list, metadata: list = None, record_ids: list = None, batch_size: int = 100):
         if not self.is_collection_exists(collection_name):
             self.logger.error(f"Collection {collection_name} does not exist.")
             return False
@@ -158,12 +162,12 @@ class QdrantDBProvider(VectorDBInterface):
 
         return True
 
-    def search_by_vector(self, collection_name: str, query_vector: list, limit: int = 5):
-        if not self.is_collection_exists(collection_name):
+    async def search_by_vector(self, collection_name: str, query_vector: list, limit: int = 5):
+        if not await self.is_collection_exists(collection_name):
             self.logger.error(f"Collection {collection_name} does not exist.")
             return []
 
-        info = self.get_collection_info(collection_name)
+        info = await self.get_collection_info(collection_name)
         vector_size = info.config.params.vectors.size
         if len(query_vector) != vector_size:
             return []
@@ -189,7 +193,7 @@ class QdrantDBProvider(VectorDBInterface):
             self.logger.error(f"Error searching vectors: {e}")
             return []
         
-    def list_collections(self) -> list:
+    async def list_collections(self) -> list:
         try:
             collections = self.client.get_collections()
             return collections.collections  # If it's an object with .collections attribute

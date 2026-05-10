@@ -5,6 +5,7 @@ from ...LLMInterface import LLMInterface
 from openai import OpenAI
 from ...LLMEnums import LLMEnums , OPENAIEnums
 import logging
+from typing import List, Union
 
 class OpenAIProvider(LLMInterface):
     def __init__(self, api_key: str, 
@@ -32,7 +33,7 @@ class OpenAIProvider(LLMInterface):
             base_url= self.base_url
         )
         self.enums= OPENAIEnums
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger("uvicorn")
     
     def set_genration_model(self, model_id: str) :
         self.generation_model = model_id
@@ -74,7 +75,7 @@ class OpenAIProvider(LLMInterface):
         # Use dot notation instead of subscript for ChatCompletionMessage object
         return response.choices[0].message.content
     
-    def embedd_text(self, text: str , document_type:str =None):
+    def embedd_text(self, text: Union[str, List[str]], document_type:str =None):
         if not self.client:
             self.logger.error("OpenAI client was not set.")
             return None
@@ -83,8 +84,9 @@ class OpenAIProvider(LLMInterface):
             self.logger.error("Embedding model for OpenAI is not set")
             return None
         
-        # print(f"Using embedding model: {self.embedding_model}")
-        # print(f"Client type: {type(self.client)}")
+        # validate if single string is passed, convert to list
+        if isinstance(text, str):
+            text = [text]
 
         response = self.client.embeddings.create(
             model= self.embedding_model,
@@ -94,9 +96,8 @@ class OpenAIProvider(LLMInterface):
         if not response or not response.data or len(response.data) ==0 or not response.data[0].embedding:
             self.logger.error("Error while embeding OpenAI.")
             return None
-
-        return response.data[0].embedding
-    
+        return [item.embedding for item in response.data]
+            
     def construct_prompt(self, prompt: str ,role:str):
         return {
             "role" : role,

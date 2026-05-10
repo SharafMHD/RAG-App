@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
         expire_on_commit=False)
 
     llm_provider_factory = LLMProvideFactory(app_settings)
-    vectordb_provider_factory = VectorDBProviderFactory(app_settings)
+    vectordb_provider_factory = VectorDBProviderFactory(config=app_settings, db_client=app.db_client)
 
     # Generation client
     app.generation_client = llm_provider_factory.create(provider=app_settings.GENERATION_BACKEND)
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
 
     # Vector DB client
     app.vector_db_client = vectordb_provider_factory.create(provider=app_settings.VECTOR_DB_BACKEND)
-    app.vector_db_client.connect()
+    await app.vector_db_client.connect()
     app.template_parser = TemplateParser(
         language=app_settings.PRIMARY_LANGUAGE,
         default_language=app_settings.DEFAULT_LANGUAGE
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     yield
 
     app.db_engine.dispose()
-    app.vector_db_client.disconnect()
+    await app.vector_db_client.disconnect()
 
 
 #  Correct place to create the app

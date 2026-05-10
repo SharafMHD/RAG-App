@@ -5,7 +5,7 @@ from .BaseDataModel import BaseDataModel
 from .db_schemes import DataChunk
 from .enums.DatabaseEnum import DatabaseEnum
 from bson.objectid import ObjectId as objectId
-from sqlalchemy import select ,delete
+from sqlalchemy import func, select ,delete
 from sqlalchemy.dialects.postgresql import UUID
 
 
@@ -68,4 +68,9 @@ class ChunkDataModel(BaseDataModel):
             data_chunks = result.scalars().all()
         return data_chunks
     
-    
+    """ Count data chunks by project ID."""
+    async def get_total_chunks_count_by_project(self, project_id: UUID) -> int:
+        async with self.db_client() as session:
+            stmt = select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_project_id == project_id)
+            result = await session.execute(stmt)
+            return result.scalar() or 0

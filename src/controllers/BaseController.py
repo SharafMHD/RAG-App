@@ -13,6 +13,6 @@ class BaseController:
         databse_path = os.path.join(self.vector_dbs_dir , db_name)
         if not os.path.exists(databse_path):
             os.makedirs(databse_path , exist_ok=True)
-        return databse_path
+            return databse_path
         self.file_dir = os.path.join(self.base_dir, self.app_settings.UPLOAD_DIR)
 

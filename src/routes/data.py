@@ -13,6 +13,7 @@ from models.ChunksDataModel import ChunkDataModel
 from models.AssetModel import AssetModel
 from models.db_schemes import Project , Asset ,DataChunk
 from models.enums.AssetTypeEnum import AssetTypeEnum
+from controllers import NLPController
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -20,7 +21,7 @@ data_router = APIRouter(
         prefix="/api/v1/data",
         tags=["api_v1" , "Data"],
     )
-
+# Define the endpoint for creating a new project
 @data_router.post("/projects/create")
 async def create_project(request:Request, project_data: ProjectData):
     print(f"Creating project with name: {project_data.project_name}, description: {project_data.description}, owner: {project_data.owner}")
@@ -50,10 +51,9 @@ async def create_project(request:Request, project_data: ProjectData):
             "description": project_data.description, 
             "owner": project_data.owner,
             "message": ResponseStatus.PROJECT_CREATED_ERROR.value})
-
+# Define the endpoint for uploading a file to a project
 @data_router.post("/upload/{project_id}")
 async def upload_file(request:Request,project_id: UUID, file: UploadFile , app_settings: Settings=Depends(get_settings)):
-    print(f"Received file: {file.filename}, content type: {file.content_type}, size: {file.size} bytes for project_id: {project_id}")
     project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     new_project = await project_model.get_project_or_create(project_id)
     # validate file type and size
@@ -85,7 +85,7 @@ async def upload_file(request:Request,project_id: UUID, file: UploadFile , app_s
 
     # Store Asset metadata in the database
     asset_model = await AssetModel.create_instance(db_client=request.app.db_client)
-    print(f"Storing asset metadata for file: {file.filename}, project_id: {project_id}, file_path: {file_path}. file_size: {os.path.getsize(file_path)} bytes")
+    logger.info(f"Storing asset metadata for file: {file.filename}, project_id: {project_id}, file_path: {file_path}. file_size: {os.path.getsize(file_path)} bytes")
     asset_resource = Asset(
             asset_project_id= new_project.project_id,
             asset_name= file_id,
@@ -101,7 +101,7 @@ async def upload_file(request:Request,project_id: UUID, file: UploadFile , app_s
         "file_id": file_id,
         "asset_id": str(asset_record.asset_id),
         "message": ResponseStatus.FILE_UPLODED_SUCCESS.value})
-
+# Define the endpoint for processing a file into chunks
 @data_router.post("/processfile/{project_id}")
 async def process_file(request:Request,project_id: UUID, process_request: ProcessRequest):
    
@@ -112,11 +112,17 @@ async def process_file(request:Request,project_id: UUID, process_request: Proces
 
     project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     project = await project_model.get_project_or_create(project_id)
-
+    nlp_controller = NLPController(
+        vector_db_client= request.app.vector_db_client,
+        generation_client= request.app.generation_client,
+        embedding_client= request.app.embedding_client,
+        template_parser= request.app.template_parser
+    )
     chunk_model =await  ChunkDataModel.create_instance(db_client=request.app.db_client)
 
     process_file_controller = ProcessFileController(project_id)
     asset_model = await AssetModel.create_instance(db_client=request.app.db_client)
+
 
     project_files_ids = {}
     if process_request.file_id:
@@ -147,6 +153,10 @@ async def process_file(request:Request,project_id: UUID, process_request: Proces
     no_of_proccessed_files = 0
     """Validate if do reset is true delete all existing chunks for the project"""
     if do_reset:
+        collection_name =  nlp_controller.create_collection_name(str(project.project_id))
+        # delete collection in vector db
+        _= await request.app.vector_db_client.drop_collection(collection_name)
+        # delete chunks in database
         await chunk_model.delete_chunks_by_project(str(project.project_id))
     # Process each file associated with the project
     for asset_id,file_id in project_files_ids.items():

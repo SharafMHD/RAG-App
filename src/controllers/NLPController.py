@@ -13,16 +13,20 @@ class NLPController(BaseController):
         self.embedding_client = embedding_client
         self.template_parser = template_parser
 
-    def create_collection_name(self, project_id:UUID):
+    async def create_collection_name(self, project_id:UUID):
         collection_name = f"collection_{self.vector_db_client.default_vector_size}_{project_id}".strip().replace(" ","_").lower()
         return collection_name
     
-    async def reset_vector_db_collection(self, project:Project):
-        collection_name = self.create_collection_name(str(project.project_id))
-        if await self.vector_db_client.collection_exists(collection_name):
-           await self.vector_db_client.delete_collection(collection_name)
+    async def reset_vector_db_collection(self, project: Project):
+        # 1. Correctly awaited
+        collection_name = await self.create_collection_name(str(project.project_id))
+        
+        # 2. Match the names in your PGVectorDBProvider.py
+        if await self.vector_db_client.is_collection_exists(collection_name):
+         self.vector_db_client.drop_collection(collection_name)
+        
         return collection_name
-    
+
     async def get_vector_db_collection_info(self, project:Project):
         collection_name = await self.create_collection_name(str(project.project_id))
         collection_info = await self.vector_db_client.get_collection_info(collection_name)

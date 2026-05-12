@@ -60,14 +60,12 @@ class OpenAIProvider(LLMInterface):
         chat_history.append(
             self.construct_prompt(prompt=prompt,role=OPENAIEnums.USER.value)
         )
-        print("chat_history",chat_history)
         response = self.client.chat.completions.create(
             model= self.generation_model,
             messages= chat_history,
             max_tokens= max_output_tokens,
             temperature= temperature
         )
-        ##print(chat_history)
         if not response or not response.choices or len(response.choices) ==0 or not response.choices[0].message :
             self.logger.error("Error while generation text with OPENAI")
             return None

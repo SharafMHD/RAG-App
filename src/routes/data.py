@@ -24,7 +24,6 @@ data_router = APIRouter(
 # Define the endpoint for creating a new project
 @data_router.post("/projects/create")
 async def create_project(request:Request, project_data: ProjectData):
-    print(f"Creating project with name: {project_data.project_name}, description: {project_data.description}, owner: {project_data.owner}")
     project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
     Projectobject = Project(    
         project_name= project_data.project_name,
@@ -153,7 +152,7 @@ async def process_file(request:Request,project_id: UUID, process_request: Proces
     no_of_proccessed_files = 0
     """Validate if do reset is true delete all existing chunks for the project"""
     if do_reset:
-        collection_name =  nlp_controller.create_collection_name(str(project.project_id))
+        collection_name = await nlp_controller.create_collection_name(str(project.project_id))
         # delete collection in vector db
         _= await request.app.vector_db_client.drop_collection(collection_name)
         # delete chunks in database

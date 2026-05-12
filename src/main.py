@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 async def lifespan(app: FastAPI):
     app_settings = get_settings()
     postgres_conn = f"postgresql+asyncpg://{app_settings.POSTGRES_USER}:{app_settings.POSTGRES_PASSWORD}@{app_settings.POSTGRES_HOST}:{app_settings.POSTGRES_PORT}/{app_settings.POSTGRES_MAIN_DB}"
-    app.db_engine = create_async_engine(postgres_conn, echo=True)
+    app.db_engine = create_async_engine(postgres_conn, echo=False)
     
     app.db_client = sessionmaker(
         bind=app.db_engine,
@@ -27,8 +27,8 @@ async def lifespan(app: FastAPI):
     app.generation_client.set_genration_model(app_settings.GENERATION_MODEL_ID)
 
     # Embedding client
-    app.emedding_client = llm_provider_factory.create(provider=app_settings.EMBEDDING_BACKEND)
-    app.emedding_client.set_embedding_model(app_settings.EMBEDDING_MODEL_ID, embedding_model_size=app_settings.EMBEDDING_MODEL_SIZE)
+    app.embedding_client = llm_provider_factory.create(provider=app_settings.EMBEDDING_BACKEND)
+    app.embedding_client.set_embedding_model(app_settings.EMBEDDING_MODEL_ID, embedding_model_size=app_settings.EMBEDDING_MODEL_SIZE)
 
     # Vector DB client
     app.vector_db_client = vectordb_provider_factory.create(provider=app_settings.VECTOR_DB_BACKEND)

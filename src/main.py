@@ -7,9 +7,12 @@ from contextlib import asynccontextmanager
 from stores.llm.Templates.template_parser import TemplateParser
 from sqlalchemy.ext.asyncio import create_async_engine , AsyncSession
 from sqlalchemy.orm import sessionmaker
+from utils.metrics import setup_metrics_endpoint
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Setup prometheus metrics endpoint
+    setup_metrics_endpoint(app)
     app_settings = get_settings()
     postgres_conn = f"postgresql+asyncpg://{app_settings.POSTGRES_USER}:{app_settings.POSTGRES_PASSWORD}@{app_settings.POSTGRES_HOST}:{app_settings.POSTGRES_PORT}/{app_settings.POSTGRES_MAIN_DB}"
     app.db_engine = create_async_engine(postgres_conn, echo=False)

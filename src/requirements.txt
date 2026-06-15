@@ -25,4 +25,7 @@ starlette-exporter==0.23.0
 #health checks
 fastapi-health==0.4.0
 
+#langfuse 
+langfuse==4.7.1
+
 

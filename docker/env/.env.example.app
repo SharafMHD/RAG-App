@@ -39,3 +39,8 @@ VECTOR_DB_BACKEND = "PGVECTOR"
 VECTOR_DB_PATH = "qdrant_db"
 VECTOR_DB_DISTANCE_METHOD = "cosine"
 PGVECTOR_INDEX_THREADHOLD = 100
+
+#======================== Langfuse Config =========================
+LANGFUSE_SECRET_KEY="sk-lf-"
+LANGFUSE_PUBLIC_KEY="pk-lf-"
+LANGFUSE_BASE_URL="http://host.docker.internal:3001"

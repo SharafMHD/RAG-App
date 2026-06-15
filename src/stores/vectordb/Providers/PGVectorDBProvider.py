@@ -1,5 +1,4 @@
 from uuid import UUID
-from pkg_resources import safe_name
 
 from ..VectorDBInterface import VectorDBInterface
 from ..VectorDBEnums import (DistanceMethodEnums,PGVectorTableSchemaEnums, 

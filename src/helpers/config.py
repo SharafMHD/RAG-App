@@ -54,6 +54,19 @@ class Settings(BaseSettings):
     # pydantic v2 style configuration for loading an env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+#======================== Celery Config =========================
+    CELERY_BROKER_URL: str = None  
+    CELERY_RESULT_BACKEND: str = None
+    CELERY_TASK_SERIALIZER: str = "json"
+    CELERY_TASK_TIME_LIMIT: int = 600
+    CELERY_TASK_ACKS_LATE: bool = True
+    CELERY_WORKER_CONCURRENCY: int = 2
+
+#======================== Langfuse Config =========================
+    langfuse_secret_key: str
+    langfuse_public_key: str
+    langfuse_base_url: str 
+
 def get_settings() -> Settings:
     """Return a Settings instance.
 

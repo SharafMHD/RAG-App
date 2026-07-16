@@ -20,4 +20,6 @@ class ResponseStatus(str, Enum):
     NLP_RAG_ANSWER_ERROR = "Failed to generate RAG answer"
     NLP_RAG_ANSWER_SUCCESS = "RAG answer generated successfully"
     PROJECT_CREATED_SUCCESS = "Project created successfully"
+    FILE_PROCESSING_STARTED = "File processing has been started"
+    File_PROCESSING_COMPLETED = "File processing has been completed"
     

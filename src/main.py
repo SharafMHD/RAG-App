@@ -16,6 +16,7 @@ from utils.metrics import setup_metrics_endpoint
 async def lifespan(app: FastAPI):
     app_settings = get_settings()
 
+    # Database connection setup
     postgres_conn = (
         f"postgresql+asyncpg://"
         f"{app_settings.POSTGRES_USER}:"
@@ -24,7 +25,7 @@ async def lifespan(app: FastAPI):
         f"{app_settings.POSTGRES_PORT}/"
         f"{app_settings.POSTGRES_MAIN_DB}"
     )
-
+    # Create an asynchronous engine and sessionmaker for database interactions
     app.db_engine = create_async_engine(postgres_conn, echo=False)
 
     app.db_client = sessionmaker(
@@ -32,7 +33,7 @@ async def lifespan(app: FastAPI):
         class_=AsyncSession,
         expire_on_commit=False,
     )
-
+    # Initialize LLM and VectorDB provider factories
     llm_provider_factory = LLMProvideFactory(app_settings)
 
     vectordb_provider_factory = VectorDBProviderFactory(
@@ -70,11 +71,11 @@ async def lifespan(app: FastAPI):
     await app.db_engine.dispose()
     await app.vector_db_client.disconnect()
 
-
+# Create the FastAPI application instance with the defined lifespan context manager
 app = FastAPI(lifespan=lifespan)
-
+# Setup the metrics endpoint for Prometheus or other monitoring tools
 setup_metrics_endpoint(app)
-
+# Include routers for different API endpoints
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(nlp.nlp_router)

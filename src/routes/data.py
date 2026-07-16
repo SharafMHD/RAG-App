@@ -14,6 +14,7 @@ from models.AssetModel import AssetModel
 from models.db_schemes import Project , Asset ,DataChunk
 from models.enums.AssetTypeEnum import AssetTypeEnum
 from controllers import NLPController
+from tasks.file_processing import process_project_files
 
 
 logger = logging.getLogger("uvicorn.error")
@@ -109,94 +110,17 @@ async def process_file(request:Request,project_id: UUID, process_request: Proces
     overlap_size = process_request.overlap_size
     do_reset = process_request.do_reset
 
-    project_model = await ProjectDataModel.create_instance(db_client=request.app.db_client)
-    project = await project_model.get_project_or_create(project_id)
-    nlp_controller = NLPController(
-        vector_db_client= request.app.vector_db_client,
-        generation_client= request.app.generation_client,
-        embedding_client= request.app.embedding_client,
-        template_parser= request.app.template_parser
+    # Delegate the file processing task to Celery
+    task = process_project_files.delay(
+        project_id=project_id,
+        file_id=process_request.file_id,
+        chunk_size=chunk_size,
+        overlap_size=overlap_size,
+        do_reset=do_reset
     )
-    chunk_model =await  ChunkDataModel.create_instance(db_client=request.app.db_client)
 
-    process_file_controller = ProcessFileController(project_id)
-    asset_model = await AssetModel.create_instance(db_client=request.app.db_client)
+    return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": True,
+        "task_id": task.id,
+        "message": ResponseStatus.FILE_PROCESSING_STARTED.value})
 
-
-    project_files_ids = {}
-    if process_request.file_id:
-        asset_recrod= await asset_model.get_asset_by_name_and_projectid(process_request.file_id,project.project_id)
-        if not asset_recrod:
-            return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"status": False, 
-                "project_id": project_id, 
-                "file_id": process_request.file_id,
-                "message": ResponseStatus.FILE_NOT_FOUND_IN_PROJECT.value})
-        
-        project_files_ids= {
-            asset_recrod.asset_id: asset_recrod.asset_name
-        }
-
-    else:
-        assets = await asset_model.get_all_assets_by_project(project.project_id, AssetTypeEnum.File.value)
-        project_files_ids = {
-            asset.asset_id: asset.asset_name
-            for asset in assets
-            }
-    # validate if file_id exists in the project
-    if not project_files_ids:
-        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"status": False, 
-            "project_id": project_id, 
-            "file_id": process_request.file_id,
-            "message": ResponseStatus.FILE_NOT_FOUND_IN_PROJECT.value})
-    inserted_chunks_count = 0
-    no_of_proccessed_files = 0
-    """Validate if do reset is true delete all existing chunks for the project"""
-    if do_reset:
-        collection_name = await nlp_controller.create_collection_name(str(project.project_id))
-        # delete collection in vector db
-        _= await request.app.vector_db_client.drop_collection(collection_name)
-        # delete chunks in database
-        await chunk_model.delete_chunks_by_project(str(project.project_id))
-    # Process each file associated with the project
-    for asset_id,file_id in project_files_ids.items():
-        logger.info(f"Processing file: {asset_id,file_id} in project {project_id}")
-        # Get file content
-        file_content = process_file_controller.get_document_content(file_id)
-        if not file_content:
-            ## TODO: Set Is Procced Flag to False in Asset
-            logger.error(f"File not found or could not be loaded: {file_id} in project {project_id}")
-            continue
-    # Process file into chunks
-    file_chunks = process_file_controller.process_file(file_content, chunk_size, overlap_size)
-    # Create DataChunk records
-    file_chunks_records = [ 
-        DataChunk(
-                chunk_content=chunk.page_content,
-                chunk_metadata= chunk.metadata,
-                chunk_order= i+1,
-                chunk_project_id=project.project_id,
-                chunk_asset_id=asset_id
-            )
-        for i, chunk in enumerate(file_chunks)
-    ]
-    
-    # Bulk insert chunks
-    inserted_chunks_count += await chunk_model.bulk_insert_data_chunks(file_chunks_records)
-    no_of_proccessed_files += 1
-    # If successfully inserted_count is 0 return error
-    if not inserted_chunks_count:
-        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 
-            "project_id": project_id, 
-            "file_id": file_id,
-            "inserted_chunks_count": inserted_chunks_count,
-            "no_of_proccessed_files": no_of_proccessed_files,
-            "message": ResponseStatus.FILE_PROCESSING_ERROR.value})
-
-    return {
-        "project_id": project_id, 
-        "file_id": file_id,
-        "inserted_chunks_count": inserted_chunks_count,
-        "no_of_proccessed_files": no_of_proccessed_files,
-        "message": ResponseStatus.FILE_PROCESSED_SUCCESS.value     
-    }
-
+   

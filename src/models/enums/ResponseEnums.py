@@ -22,4 +22,6 @@ class ResponseStatus(str, Enum):
     PROJECT_CREATED_SUCCESS = "Project created successfully"
     FILE_PROCESSING_STARTED = "File processing has been started"
     File_PROCESSING_COMPLETED = "File processing has been completed"
+    Data_INDEXING_STARTED = "Data indexing has been started"
+    Data_INDEXING_COMPLETED = "Data indexing has been completed"
     

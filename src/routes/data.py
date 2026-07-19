@@ -2,20 +2,18 @@ from fastapi import UploadFile, Depends, APIRouter, status , Request
 from fastapi.responses import JSONResponse
 from models import ResponseStatus
 from helpers.config import get_settings, Settings
-from controllers import DataController , ProcessFileController
+from controllers import DataController 
 import logging
 import aiofiles
 import os
 from uuid import UUID
 from routes.schemes.data import ProcessRequest ,ProjectData
 from models.ProjectDataModel import ProjectDataModel
-from models.ChunksDataModel import ChunkDataModel
 from models.AssetModel import AssetModel
-from models.db_schemes import Project , Asset ,DataChunk
+from models.db_schemes import Project , Asset 
 from models.enums.AssetTypeEnum import AssetTypeEnum
-from controllers import NLPController
 from tasks.file_processing import process_project_files
-
+from tasks.process_workflow import process_and_index_workflow
 
 logger = logging.getLogger("uvicorn.error")
 data_router = APIRouter(
@@ -121,6 +119,27 @@ async def process_file(request:Request,project_id: UUID, process_request: Proces
 
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": True,
         "task_id": task.id,
+        "message": ResponseStatus.FILE_PROCESSING_STARTED.value})
+# Define the endpoint for processing and indexing a file into chunks
+@data_router.post("/process_and_index/{project_id}")
+async def process_and_index(request:Request,project_id: UUID, process_request: ProcessRequest):
+   
+   # file_id = process_request.file_id
+    chunk_size = process_request.chunk_size
+    overlap_size = process_request.overlap_size
+    do_reset = process_request.do_reset
+
+    # Delegate the file processing task to Celery
+    workflow_task = process_and_index_workflow.delay(
+        project_id=project_id,
+        file_id=process_request.file_id,
+        chunk_size=chunk_size,
+        overlap_size=overlap_size,
+        do_reset=do_reset
+    )
+
+    return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content={"status": True,
+        "workflow_task_id": workflow_task.id,
         "message": ResponseStatus.FILE_PROCESSING_STARTED.value})
 
    

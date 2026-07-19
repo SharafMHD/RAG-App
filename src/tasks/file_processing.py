@@ -14,22 +14,8 @@ from controllers import NLPController, ProcessFileController
 logger = logging.getLogger("celery.task")
 
 
-@celery_app.task(
-    bind=True,
-    name="tasks.file_processing.process_project_files",
-    acks_late=True,
-    reject_on_worker_lost=True,
-    time_limit=3600,
-    soft_time_limit=3500,
-)
-def process_project_files(
-    self,
-    project_id: UUID,
-    file_id: str | None,
-    chunk_size: int,
-    overlap_size: int,
-    do_reset: bool = False,
-):
+@celery_app.task( bind=True, name="tasks.file_processing.process_project_files", acks_late=True, reject_on_worker_lost=True, time_limit=3600, soft_time_limit=3500, )
+def process_project_files( self, project_id: UUID, file_id: str | None, chunk_size: int, overlap_size: int, do_reset: bool = False, ):
     return asyncio.run(
         _process_project_files(
             task_instance=self,
@@ -42,28 +28,12 @@ def process_project_files(
     )
 
 
-async def _process_project_files(
-    task_instance,
-    project_id,
-    file_id,
-    chunk_size,
-    overlap_size,
-    do_reset,
-):
+async def _process_project_files( task_instance, project_id, file_id, chunk_size, overlap_size, do_reset, ):
     db_engine = None
     vector_db_client = None
 
     try:
-        (
-            db_engine,
-            db_client,
-            llm_provider_factory,
-            vectordb_provider_factory,
-            generation_client,
-            embedding_client,
-            vector_db_client,
-            template_parser,
-        ) = await get_setup_utilites()
+        (db_engine, db_client, llm_provider_factory,vectordb_provider_factory, generation_client, embedding_client, vector_db_client, template_parser ) = await get_setup_utilites()
 
         project_model = await ProjectDataModel.create_instance(
             db_client=db_client
@@ -99,8 +69,17 @@ async def _process_project_files(
                     project.project_id,
                 )
             )
-
+            #validate if the asset exists in the project
             if not asset_record:
+                task_instance.update_state(
+                    state="FAILURE",    
+                    meta={
+                        "status": False,
+                        "file_id": str(file_id),
+                        "project_id": str(project_id),
+                        "message": ResponseStatus.ASSET_NOT_FOUND_ERROR.value
+                    }
+                )
                 raise FileNotFoundError(
                     f"File '{file_id}' was not found "
                     f"in project '{project_id}'."
@@ -245,8 +224,9 @@ async def _process_project_files(
 
         result = {
             "status": True,
-            "project_id": str(project_id),
-            "file_id": str(file_id) if file_id else None,
+            "project_id": project_id,
+            "file_id": file_id,
+            "do_reset": do_reset,
             "inserted_chunks_count": inserted_chunks_count,
             "number_of_processed_files": number_of_processed_files,
             "number_of_skipped_files": number_of_skipped_files,

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Any, Optional
 
 
 class PushRequest(BaseModel):
@@ -17,3 +17,42 @@ class SearchRequest(BaseModel):
         if not value:
             raise ValueError("text must not be blank")
         return value
+
+
+class Citation(BaseModel):
+    source_id: str = Field(..., description="Stable source reference shown in the answer UI, e.g. source_1")
+    rank: int = Field(..., ge=1)
+    score: float | None = None
+    document_name: str | None = None
+    page_number: int | None = None
+    chunk_id: str | None = None
+
+
+class SourceChunk(BaseModel):
+    source_id: str
+    rank: int = Field(..., ge=1)
+    text: str
+    score: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class RetrievalMetadata(BaseModel):
+    strategy: str = "vector"
+    requested_top_k: int = Field(..., ge=1)
+    returned_count: int = Field(..., ge=0)
+    vector_top_k: int | None = None
+    bm25_top_k: int | None = None
+    rerank_top_n: int | None = None
+    min_relevance_score: float | None = None
+
+
+class ChatAnswerResponse(BaseModel):
+    status: bool = True
+    knowledge_base_id: str
+    answer: str
+    citations: list[Citation] = Field(default_factory=list)
+    source_chunks: list[SourceChunk] = Field(default_factory=list)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    retrieval_metadata: RetrievalMetadata
+    trace_id: str
+    message: str

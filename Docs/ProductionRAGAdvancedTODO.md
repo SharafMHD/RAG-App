@@ -417,17 +417,17 @@ Priority: **High**
 
 Goal: define stable backend/frontend contracts before adding advanced features.
 
-- [ ] Review current ingestion, retrieval, and answer endpoints.
-- [ ] Define final chat API response schema:
+- [x] Review current ingestion, retrieval, and answer endpoints.
+- [x] Define final chat API response schema:
   - answer
   - citations
   - source chunks
   - confidence
   - retrieval metadata
   - trace ID
-- [ ] Define frontend/backend contract for knowledge base selection.
-- [ ] Add basic smoke tests for current RAG flow.
-- [ ] Confirm production env/config values needed for RAG, Langfuse, and frontend.
+- [x] Define frontend/backend contract for knowledge base selection.
+- [x] Add basic smoke tests for current RAG flow.
+- [x] Confirm production env/config values needed for RAG, Langfuse, and frontend.
 
 Exit criteria: current backend flow is documented and the future Next.js UI knows what API shape to consume.
 

@@ -5,7 +5,7 @@ from helpers.config import Settings
 from controllers.DataController import DataController
 from controllers.ProcessFileController import ProcessFileController
 from routes.schemes.data import KnowledgeBaseData
-from routes.schemes.nlp import SearchRequest
+from routes.schemes.nlp import ChatAnswerResponse, SearchRequest
 from stores.llm.Templates.template_parser import TemplateParser
 
 
@@ -63,6 +63,39 @@ def test_upload_filename_is_sanitized_and_basenamed():
     controller = DataController.__new__(DataController)
 
     assert controller.get_clean_filename("../../bad name?.pdf") == "bad_name_.pdf"
+
+
+def test_chat_answer_contract_matches_frontend_shape():
+    response = ChatAnswerResponse(
+        knowledge_base_id="kb-1",
+        answer="RAG combines retrieval and generation.",
+        citations=[],
+        source_chunks=[],
+        confidence=0.8,
+        retrieval_metadata={
+            "strategy": "vector",
+            "requested_top_k": 5,
+            "returned_count": 0,
+            "vector_top_k": 5,
+        },
+        trace_id="trace-1",
+        message="ok",
+    )
+
+    payload = response.model_dump()
+
+    assert set(payload) == {
+        "status",
+        "knowledge_base_id",
+        "answer",
+        "citations",
+        "source_chunks",
+        "confidence",
+        "retrieval_metadata",
+        "trace_id",
+        "message",
+    }
+    assert payload["retrieval_metadata"]["strategy"] == "vector"
 
 
 def test_simple_splitter_respects_overlap():

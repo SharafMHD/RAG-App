@@ -102,7 +102,7 @@ class NLPController(BaseController):
     
     async def answer_rag_query(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10):
         
-        answer, full_prompt, chat_history = None, None, None
+        answer, full_prompt, chat_history, retrieved_documents = None, None, None, []
         #Step 1: Search index for relevant documents
         retrieved_documents  = await self.search_index(
             knowledge_base= knowledge_base,
@@ -111,7 +111,7 @@ class NLPController(BaseController):
         )
         
         if not retrieved_documents or len(retrieved_documents) == 0:
-            return answer, full_prompt, chat_history
+            return answer, full_prompt, chat_history, retrieved_documents
         
         # step2: Construct LLM prompt
         system_prompt = self.template_parser.get_template_module("rag", "system_prompt")
@@ -128,7 +128,7 @@ class NLPController(BaseController):
             "query_text": query_text,
         })
         if not system_prompt or not footer_prompt:
-            return answer, full_prompt, chat_history
+            return answer, full_prompt, chat_history, retrieved_documents
          # step3: Construct Generation Client Prompts
         chat_history = [
             self.generation_client.construct_prompt(
@@ -145,6 +145,6 @@ class NLPController(BaseController):
             chat_history=chat_history
         )
         
-        return answer, full_prompt, chat_history
+        return answer, full_prompt, chat_history, retrieved_documents
 
        

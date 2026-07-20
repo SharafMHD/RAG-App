@@ -24,4 +24,5 @@ class ResponseStatus(str, Enum):
     File_PROCESSING_COMPLETED = "File processing has been completed"
     Data_INDEXING_STARTED = "Data indexing has been started"
     Data_INDEXING_COMPLETED = "Data indexing has been completed"
+    DATA_CHUNKING_NOT_FOUND = "Data chunking not found"
     

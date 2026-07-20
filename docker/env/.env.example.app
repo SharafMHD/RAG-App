@@ -11,8 +11,8 @@ FILE_OVERLAP_SIZE=5120 # in kb
 #MONGODB_URL="mongodb://admin:admin@localhost:27017"
 #MONGODB_DB_NAME="rag_app_db"
 #========================= Postgres Config =========================
-POSTGRES_HOST="pgvector"
-POSTGRES_PORT=5432
+POSTGRES_HOST="localhost"
+POSTGRES_PORT=5400
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="admin"
 POSTGRES_MAIN_DB="rag_app_db"
@@ -44,3 +44,12 @@ PGVECTOR_INDEX_THREADHOLD = 100
 LANGFUSE_SECRET_KEY="sk-lf-"
 LANGFUSE_PUBLIC_KEY="pk-lf-"
 LANGFUSE_BASE_URL="http://host.docker.internal:3001"
+
+#======================== Celery Config =========================
+CELERY_BROKER_URL="amqp://rag_app_user:RAG_APP_PWD@rabbitmq:5672/Rag_App_VHost"    
+CELERY_RESULT_BACKEND="redis://:RAG_APP_PWD@redis:6379/0"
+CELERY_TASK_SERIALIZER="json"
+CELERY_TASK_TIME_LIMIT=600
+CELERY_TASK_ACKS_LATE=true
+CELERY_WORKER_CONCURRENCY=2
+CELERY_FLOWER_PASSWORD="RAG_APP_PWD"

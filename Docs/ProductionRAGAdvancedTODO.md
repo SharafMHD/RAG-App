@@ -5,6 +5,13 @@ This document captures the advanced RAG production-readiness plan for this app, 
 
 ---
 
+## Completed Sprint Documentation
+
+- [x] [Sprint 1 — Evaluation Foundation](Sprint1EvaluationFoundation.md)
+- [x] [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md)
+
+---
+
 ## Target Retrieval Pipeline
 
 ```text
@@ -83,9 +90,9 @@ Priority: **High**
 
 ## 1. Advanced Retrieval Techniques
 
-- [ ] Add BM25 keyword search.
-- [ ] Add hybrid retrieval: vector search + BM25.
-- [ ] Add result fusion between vector and BM25 results.
+- [x] Add BM25 keyword search. Completed in [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
+- [x] Add hybrid retrieval: vector search + BM25. Completed in [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
+- [x] Add result fusion between vector and BM25 results. Completed with Reciprocal Rank Fusion in [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
 - [ ] Add re-ranking after initial retrieval.
 - [ ] Add query expansion.
 - [ ] Add optional HyDE mode.
@@ -147,11 +154,11 @@ Priority: **Medium**
 
 ## 5. Evaluation and Quality Measurement
 
-- [ ] Create golden test dataset:
+- [x] Create golden test dataset:
   - question
   - expected answer
   - expected source chunks
-- [ ] Measure retrieval quality:
+- [x] Measure retrieval quality:
   - recall@k
   - precision@k
   - MRR
@@ -161,6 +168,7 @@ Priority: **Medium**
   - citation correctness
 - [ ] Add RAGAS or similar evaluation.
 - [ ] Run evals before every release.
+- [x] Add retrieval prediction generation and multi-run comparison for vector, BM25, and hybrid retrieval. Completed in [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
 
 Priority: **Very High**
 
@@ -413,7 +421,7 @@ Priority: **High**
 
 # Suggested Implementation Sprints
 
-## Sprint 0 — Baseline and Contracts
+## Sprint 0 — Baseline and Contracts ✅ Completed
 
 Goal: define stable backend/frontend contracts before adding advanced features.
 
@@ -433,45 +441,50 @@ Exit criteria: current backend flow is documented and the future Next.js UI know
 
 ---
 
-## Sprint 1 — Evaluation Foundation
+## Sprint 1 — Evaluation Foundation ✅ Completed
 
 Goal: create measurement before changing retrieval quality.
 
-- [ ] Create golden dataset:
+- [x] Create golden dataset:
   - question
   - expected answer
-  - expected source chunks
-- [ ] Add retrieval metrics:
+  - expected source chunks/page terms
+- [x] Add retrieval metrics:
   - recall@k
   - precision@k
   - MRR
-- [ ] Add answer quality checks:
-  - faithfulness
-  - relevance
+- [x] Add answer quality checks:
+  - faithfulness/source-term coverage
+  - relevance/page recall
   - citation correctness
-- [ ] Add regression test command.
-- [ ] Add RAGAS or LLM-as-judge evaluation later if needed.
+- [x] Add regression test command.
+- [x] Defer RAGAS or LLM-as-judge evaluation until needed.
 
 Exit criteria: every retrieval/prompt change can be compared against baseline.
 
 ---
 
-## Sprint 2 — Core Retrieval Upgrade
+## Sprint 2 — Retrieval Quality Foundation ✅ Completed
 
-Goal: improve answer relevance with hybrid search and reranking.
+Goal: improve retrieval relevance with measurable vector, BM25-like lexical, and hybrid search. See [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
 
-- [ ] Add BM25 keyword search.
-- [ ] Add hybrid vector + BM25 retrieval.
-- [ ] Add result fusion.
-- [ ] Add re-ranking.
-- [ ] Add metadata filtering by knowledge base/document/user where applicable.
-- [ ] Add retrieval config:
+- [x] Add BM25 keyword search.
+- [x] Add hybrid vector + BM25 retrieval.
+- [x] Add result fusion with Reciprocal Rank Fusion.
+- [x] Add citation-capable retrieval metadata: chunk ID, source, page number, metadata, score, retrieval mode.
+- [x] Add retrieval prediction generation for vector, BM25, and hybrid modes.
+- [x] Add multi-run retrieval comparison reporting.
+- [x] Add retrieval config:
   - `VECTOR_TOP_K`
   - `BM25_TOP_K`
-  - `RERANK_TOP_N`
+  - `HYBRID_TOP_N`
+  - `RRF_K`
   - `MIN_RELEVANCE_SCORE`
+- [ ] Add re-ranking. Deferred to next retrieval-quality sprint.
+- [ ] Add document/user permission filtering where applicable. Knowledge-base filtering is already part of the current retrieval path.
+- [ ] Add `RERANK_TOP_N` after reranking is implemented.
 
-Exit criteria: hybrid + rerank improves eval metrics compared with baseline.
+Exit criteria met for Sprint 2 foundation: vector, BM25, and hybrid retrieval can be generated, compared, and reported against the golden eval dataset.
 
 ---
 

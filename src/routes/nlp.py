@@ -44,13 +44,13 @@ def _build_chat_contract(knowledge_base_id: UUID, answer: str, retrieved_documen
         if score is not None:
             scores.append(float(score))
         source_id = f"source_{rank}"
-        chunk_id = _metadata_value(metadata, "chunk_id", "id")
+        chunk_id = getattr(document, "chunk_id", None) or _metadata_value(metadata, "chunk_id", "id")
         citations.append(Citation(
             source_id=source_id,
             rank=rank,
             score=score,
             document_name=_metadata_value(metadata, "document_name", "file_name", "source"),
-            page_number=_metadata_value(metadata, "page_number", "page"),
+            page_number=getattr(document, "page_number", None) or _metadata_value(metadata, "page_number", "page"),
             chunk_id=str(chunk_id) if chunk_id is not None else None,
         ))
         source_chunks.append(SourceChunk(
@@ -72,6 +72,7 @@ def _build_chat_contract(knowledge_base_id: UUID, answer: str, retrieved_documen
         source_chunks=source_chunks,
         confidence=confidence,
         retrieval_metadata=RetrievalMetadata(
+            strategy=(getattr(retrieved_documents[0], "retrieval_mode", None) if retrieved_documents else None) or "vector",
             requested_top_k=limit,
             returned_count=len(retrieved_documents),
             vector_top_k=limit,
@@ -93,7 +94,7 @@ async def index_knowledge_base( request: Request, knowledge_base_id: UUID, push_
 
 
 @nlp_router.get("/index/info/{knowledge_base_id}")
-async def get_index_info(request:Request, knowledge_base_id: UUID):
+async def get_index_info(request:Request, knowledge_base_id: UUID, app_settings: Settings = Depends(get_settings)):
 
     # Initialize models
     knowledge_base_model = await KnowledgeBaseDataModel.create_instance(db_client=request.app.db_client)
@@ -105,7 +106,9 @@ async def get_index_info(request:Request, knowledge_base_id: UUID):
         generation_client=request.app.generation_client,
         embedding_client=request.app.embedding_client,
         vector_db_client=request.app.vector_db_client,
-        template_parser=request.app.template_parser
+        template_parser=request.app.template_parser,
+        db_client=request.app.db_client,
+        settings=app_settings,
     )
 
     collection_info = await nlp_controller.get_vector_db_collection_info(knowledge_base=knowledge_base)
@@ -115,7 +118,7 @@ async def get_index_info(request:Request, knowledge_base_id: UUID):
         "message": ResponseStatus.NLP_INDEX_INFO_SUCCESS.value})
 
 @nlp_router.post("/index/search/{knowledge_base_id}")
-async def search_index(request:Request, knowledge_base_id: UUID, search_request: SearchRequest):
+async def search_index(request:Request, knowledge_base_id: UUID, search_request: SearchRequest, app_settings: Settings = Depends(get_settings)):
 
         # Initialize models
     knowledge_base_model = await KnowledgeBaseDataModel.create_instance(db_client=request.app.db_client)
@@ -127,11 +130,13 @@ async def search_index(request:Request, knowledge_base_id: UUID, search_request:
         generation_client=request.app.generation_client,
         embedding_client=request.app.embedding_client,
         vector_db_client=request.app.vector_db_client,
-        template_parser=request.app.template_parser
+        template_parser=request.app.template_parser,
+        db_client=request.app.db_client,
+        settings=app_settings,
     )
     # Implement search logic here
 
-    results = await nlp_controller.search_index(knowledge_base=knowledge_base , text=search_request.text , limit=search_request.limit)
+    results = await nlp_controller.search_index(knowledge_base=knowledge_base , text=search_request.text , limit=search_request.limit, strategy=search_request.strategy)
 
 
     if not results:
@@ -146,7 +151,7 @@ async def search_index(request:Request, knowledge_base_id: UUID, search_request:
     
     
 @nlp_router.post("/index/answer/{knowledge_base_id}", response_model=ChatAnswerResponse)
-async def answer_rag(request:Request, knowledge_base_id: UUID, search_request: SearchRequest):
+async def answer_rag(request:Request, knowledge_base_id: UUID, search_request: SearchRequest, app_settings: Settings = Depends(get_settings)):
 
         # Initialize models
     knowledge_base_model = await KnowledgeBaseDataModel.create_instance(db_client=request.app.db_client)
@@ -158,12 +163,15 @@ async def answer_rag(request:Request, knowledge_base_id: UUID, search_request: S
         generation_client=request.app.generation_client,
         embedding_client=request.app.embedding_client,
         vector_db_client=request.app.vector_db_client,
-        template_parser=request.app.template_parser
+        template_parser=request.app.template_parser,
+        db_client=request.app.db_client,
+        settings=app_settings,
     )
     answer, _, _, retrieved_documents = await nlp_controller.answer_rag_query(
         knowledge_base=knowledge_base , 
         query_text=search_request.text , 
-        limit=search_request.limit
+        limit=search_request.limit,
+        strategy=search_request.strategy,
     )
     if not answer:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"status": False, 

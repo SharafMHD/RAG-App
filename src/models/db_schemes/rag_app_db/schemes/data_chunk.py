@@ -2,7 +2,8 @@ from .rag_app_db_base import SQLAlchemyBase
 from sqlalchemy import Column, Index, Integer, String, DateTime ,ForeignKey, func 
 from sqlalchemy.dialects.postgresql import UUID ,JSONB
 from sqlalchemy.orm import relationship
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Any
 import uuid 
 
 
@@ -37,3 +38,8 @@ class DataChunk(SQLAlchemyBase):
 class RetrievedDocuments(BaseModel):
     text: str
     score: float
+    chunk_id: str | None = None
+    source: str | None = None
+    page_number: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    retrieval_mode: str | None = None

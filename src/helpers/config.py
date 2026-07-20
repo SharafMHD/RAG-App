@@ -59,6 +59,15 @@ class Settings(BaseSettings):
     VECTOR_DBS_DIR: str = "assets/vector_dbs"
     PGVECTOR_INDEX_THREADHOLD: int = 1000
 
+    # Retrieval settings
+    HYBRID_SEARCH_ENABLED: bool = False
+    BM25_ENABLED: bool = False
+    VECTOR_TOP_K: int = 30
+    BM25_TOP_K: int = 30
+    HYBRID_TOP_N: int = 10
+    RRF_K: int = 60
+    MIN_RELEVANCE_SCORE: float = 0.0
+
     # Templates settings
     DEFAULT_LANGUAGE: str = "en"
     PRIMARY_LANGUAGE: str = "en"
@@ -123,6 +132,8 @@ class Settings(BaseSettings):
             raise ValueError("EMBEDDING_MODEL_SIZE must be greater than 0")
         if self.RATE_LIMIT_REQUESTS <= 0 or self.RATE_LIMIT_WINDOW_SECONDS <= 0:
             raise ValueError("rate limit settings must be greater than 0")
+        if min(self.VECTOR_TOP_K, self.BM25_TOP_K, self.HYBRID_TOP_N, self.RRF_K) <= 0:
+            raise ValueError("retrieval top-k settings must be greater than 0")
         if self.REQUIRE_API_KEY and not self.API_KEY:
             raise ValueError("API_KEY must be set when REQUIRE_API_KEY=true")
         if self.ENVIRONMENT == "production":

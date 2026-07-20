@@ -296,6 +296,8 @@ class PGVectorDBProvider(VectorDBInterface):
                 search_sql_stmt = sql_text(f"""
                     SELECT
                         {PGVectorTableSchemaEnums.TEXT.value} AS text,
+                        {PGVectorTableSchemaEnums.CHUNK_ID.value}::text AS chunk_id,
+                        {PGVectorTableSchemaEnums.METADATA.value} AS metadata,
                         1 - ({PGVectorTableSchemaEnums.VECTOR.value} {self.search_operator} CAST(:query_vector AS vector)) AS score
                     FROM {safe_collection_name}
                     ORDER BY {PGVectorTableSchemaEnums.VECTOR.value} {self.search_operator} CAST(:query_vector AS vector)
@@ -315,7 +317,12 @@ class PGVectorDBProvider(VectorDBInterface):
                 return [
                     RetrievedDocuments(
                         text=record.text,
-                        score=record.score
+                        score=record.score,
+                        chunk_id=record.chunk_id,
+                        metadata=record.metadata or {},
+                        page_number=(record.metadata or {}).get("page_number") or (record.metadata or {}).get("page"),
+                        source=(record.metadata or {}).get("document_name") or (record.metadata or {}).get("file_name") or (record.metadata or {}).get("source"),
+                        retrieval_mode="vector",
                     )
                     for record in records
                 ]

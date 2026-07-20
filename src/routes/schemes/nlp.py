@@ -9,6 +9,7 @@ class PushRequest(BaseModel):
 class SearchRequest(BaseModel):
     text: str = Field(..., min_length=1)
     limit: Optional[int] = Field(default=5, ge=1, le=50)
+    strategy: Optional[str] = Field(default=None, pattern="^(vector|bm25|hybrid)$")
 
     @field_validator("text")
     @classmethod

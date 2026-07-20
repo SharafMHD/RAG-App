@@ -28,12 +28,12 @@ class AssetModel(BaseDataModel):
             await session.refresh(asset)
         return asset
     
-    async def get_all_assets_by_project(self, asset_project_id: UUID, asset_type: str) -> list[Asset]:
-        """Retrieve all assets by its project_id."""
+    async def get_all_assets_by_knowledge_base(self, asset_knowledge_base_id: UUID, asset_type: str) -> list[Asset]:
+        """Retrieve all assets by its knowledge_base_id."""
         async with self.db_client() as session:
             # 1. Define the statement
             stmt = select(Asset).where(
-                Asset.asset_project_id == asset_project_id,
+                Asset.asset_knowledge_base_id == asset_knowledge_base_id,
                 Asset.asset_type == asset_type
             )
             
@@ -44,15 +44,13 @@ class AssetModel(BaseDataModel):
         return assets_files
 
 
-    async def get_asset_by_name_and_projectid(self, asset_name: str , project_id: UUID) -> Asset | None:
-        """Retrieve an asset by its ID."""
+    async def get_asset_by_name_and_knowledge_baseid(self, asset_name: str , knowledge_base_id: UUID) -> Asset | None:
+        """Retrieve an asset by name and knowledge_base ID."""
         async with self.db_client() as session:
-            async with session.begin():
-                await session.execute(select(Asset).where(
-                    Asset.asset_name == asset_name,
-                    Asset.asset_project_id == project_id
-                ))
-                asset_file = session.scalar_one_or_none()
-        return asset_file
+            result = await session.execute(select(Asset).where(
+                Asset.asset_name == asset_name,
+                Asset.asset_knowledge_base_id == knowledge_base_id
+            ))
+            return result.scalar_one_or_none()
         
     

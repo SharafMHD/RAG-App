@@ -19,12 +19,16 @@ class PGVectorDBProvider(VectorDBInterface):
         self.default_vector_size = default_vector_size
         self.index_threadhold = index_threadhold
 
+        self.search_operator = "<->"
         if default_distance_method == DistanceMethodEnums.COSINE.value:
             default_distance_method = PGVectorDistanceMethodEnums.COSINE.value
+            self.search_operator = "<=>"
         elif default_distance_method == DistanceMethodEnums.EUCLIDEAN.value:
             default_distance_method = PGVectorDistanceMethodEnums.EUCLIDEAN.value
+            self.search_operator = "<->"
         elif default_distance_method == DistanceMethodEnums.DOT.value:
             default_distance_method = PGVectorDistanceMethodEnums.DOT.value
+            self.search_operator = "<#>"
 
         self.default_distance_method = default_distance_method
 
@@ -160,7 +164,10 @@ class PGVectorDBProvider(VectorDBInterface):
         # create index
         async with self.client() as session:
             async with session.begin():
-                count_sql = sql_text(f"SELECT COUNT(*) FROM {collection_name}")
+                preparer = IdentifierPreparer(postgresql.dialect())
+                safe_collection_name = preparer.quote(collection_name)
+                safe_index_name = preparer.quote(self.default_index_name(collection_name))
+                count_sql = sql_text(f"SELECT COUNT(*) FROM {safe_collection_name}")
                 records_count = await session.execute(count_sql)
                 records_count = records_count.scalar()
                 # check if we have enough records to create index based on the threadhold defined in config
@@ -171,8 +178,8 @@ class PGVectorDBProvider(VectorDBInterface):
                 # create index
                 self.logger.info(f"START creating index for collection {collection_name}, as current count of records is {records_count}.")
                 create_idx_sql = sql_text(
-                    f"CREATE INDEX {self.default_index_name(collection_name)} ON {collection_name} "
-                    f"USING {index_type} ({PGVectorTableSchemaEnums.VECTOR.value} , {self.default_distance_method} )"
+                    f"CREATE INDEX {safe_index_name} ON {safe_collection_name} "
+                    f"USING {index_type} ({PGVectorTableSchemaEnums.VECTOR.value} {self.default_distance_method})"
                 )
                 print(f"create index sql: {create_idx_sql}")
                 await session.execute(create_idx_sql)
@@ -183,7 +190,9 @@ class PGVectorDBProvider(VectorDBInterface):
         # drop index if exists
         async with self.client() as session:
             async with session.begin():
-                drop_idx_sql = sql_text(f"DROP INDEX IF EXISTS {self.default_index_name(collection_name)}")
+                preparer = IdentifierPreparer(postgresql.dialect())
+                safe_index_name = preparer.quote(self.default_index_name(collection_name))
+                drop_idx_sql = sql_text(f"DROP INDEX IF EXISTS {safe_index_name}")
                 await session.execute(drop_idx_sql)
                 await session.commit()
         self.logger.info(f"Dropped index for collection {collection_name} if it existed.")
@@ -206,8 +215,10 @@ class PGVectorDBProvider(VectorDBInterface):
             # start insert transaction
             async with self.client() as session:
                 async with session.begin():
+                    preparer = IdentifierPreparer(postgresql.dialect())
+                    safe_collection_name = preparer.quote(collection_name)
                     inser_sql = sql_text(
-                        f"INSERT INTO {collection_name} ({PGVectorTableSchemaEnums.TEXT.value}, {PGVectorTableSchemaEnums.VECTOR.value}, {PGVectorTableSchemaEnums.CHUNK_ID.value}, {PGVectorTableSchemaEnums.METADATA.value}) "
+                        f"INSERT INTO {safe_collection_name} ({PGVectorTableSchemaEnums.TEXT.value}, {PGVectorTableSchemaEnums.VECTOR.value}, {PGVectorTableSchemaEnums.CHUNK_ID.value}, {PGVectorTableSchemaEnums.METADATA.value}) "
                         "VALUES (:text, :vector, :chunk_id, :metadata)"
                     )
                     await session.execute(inser_sql, {"text": text, 
@@ -285,9 +296,9 @@ class PGVectorDBProvider(VectorDBInterface):
                 search_sql_stmt = sql_text(f"""
                     SELECT
                         {PGVectorTableSchemaEnums.TEXT.value} AS text,
-                        1 - ({PGVectorTableSchemaEnums.VECTOR.value} <-> CAST(:query_vector AS vector)) AS score
+                        1 - ({PGVectorTableSchemaEnums.VECTOR.value} {self.search_operator} CAST(:query_vector AS vector)) AS score
                     FROM {safe_collection_name}
-                    ORDER BY {PGVectorTableSchemaEnums.VECTOR.value} <-> CAST(:query_vector AS vector)
+                    ORDER BY {PGVectorTableSchemaEnums.VECTOR.value} {self.search_operator} CAST(:query_vector AS vector)
                     LIMIT :limit
                 """)
 

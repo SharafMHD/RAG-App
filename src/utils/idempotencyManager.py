@@ -11,13 +11,13 @@ logger = logging.getLogger("celery.task")
 
 class IdempotencyManager:
 
-    def __init__(self, db_client, project_id=None):
+    def __init__(self, db_client, knowledge_base_id=None):
         """
         Initialize the Idempotency Manager.
         Reuses the global AsyncSession factory pool wrapper.
         """
         self.db_client = db_client
-        self.project_id = project_id
+        self.knowledge_base_id = knowledge_base_id
 
     def generate_task_args_hash(self, task_name: str, task_args: dict) -> str:
         """Generate a deterministic SHA256 hash for task arguments."""

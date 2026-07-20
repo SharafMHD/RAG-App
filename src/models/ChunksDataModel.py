@@ -44,33 +44,32 @@ class ChunkDataModel(BaseDataModel):
        
 
     """Get data chunks by their ID."""
-    async def get_data_chunks_by_id(self, chunk_id: UUID) -> list[DataChunk]:
+    async def get_data_chunks_by_id(self, chunk_id: UUID) -> DataChunk | None:
         async with self.db_client() as session:
-            await session.execute(select(DataChunk).where(DataChunk.chunk_id == chunk_id))
-            data_chunk = session.scalar_one_or_none()
-            if data_chunk:
-                return data_chunk
-            return None
+            result = await session.execute(
+                select(DataChunk).where(DataChunk.chunk_id == chunk_id)
+            )
+            return result.scalar_one_or_none()
     
-    """Delete Chunks by  project"""
-    async def delete_chunks_by_project(self, project_id:UUID):
+    """Delete Chunks by  knowledge_base"""
+    async def delete_chunks_by_knowledge_base(self, knowledge_base_id:UUID):
         async with self.db_client() as session: 
-            query= delete(DataChunk).where(DataChunk.chunk_project_id == project_id)
+            query= delete(DataChunk).where(DataChunk.chunk_knowledge_base_id == knowledge_base_id)
             result= await session.execute(query)
             await session.commit()
         return result.rowcount > 0
     
-    """Get data chunks by project ID."""
-    async def get_data_chunks_by_project(self, project_id: UUID , page_no:int=1 ,page_size:int=50) -> list[DataChunk]:
+    """Get data chunks by knowledge_base ID."""
+    async def get_data_chunks_by_knowledge_base(self, knowledge_base_id: UUID , page_no:int=1 ,page_size:int=50) -> list[DataChunk]:
         async with self.db_client() as session:
-            stmt= select(DataChunk).where(DataChunk.chunk_project_id == project_id).offset((page_no - 1) * page_size).limit(page_size)
+            stmt= select(DataChunk).where(DataChunk.chunk_knowledge_base_id == knowledge_base_id).offset((page_no - 1) * page_size).limit(page_size)
             result = await session.execute(stmt)
             data_chunks = result.scalars().all()
         return data_chunks
     
-    """ Count data chunks by project ID."""
-    async def get_total_chunks_count_by_project(self, project_id: UUID) -> int:
+    """ Count data chunks by knowledge_base ID."""
+    async def get_total_chunks_count_by_knowledge_base(self, knowledge_base_id: UUID) -> int:
         async with self.db_client() as session:
-            stmt = select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_project_id == project_id)
+            stmt = select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_knowledge_base_id == knowledge_base_id)
             result = await session.execute(stmt)
             return result.scalar() or 0

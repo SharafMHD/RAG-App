@@ -18,6 +18,12 @@ services:
         condition: service_healthy
     env_file:
       - ./env/.env.app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
    # Celery Worker
   celery-worker:
     build:
@@ -39,6 +45,12 @@ services:
     env_file:
       - ./env/.env.app
     command: ["python", "-m", "celery", "-A", "celery_app", "worker", "--queues=default,file_processing_queue,data_indexing_queue,log_retention_queue", "--loglevel=info"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -m celery -A celery_app inspect ping --timeout=5 >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
 
   # Celery Beat Scheduler
   celery-beat:
@@ -60,6 +72,12 @@ services:
     env_file:
       - ./env/.env.app
     command: ["python", "-m", "celery", "-A", "celery_app", "beat", "--loglevel=info"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'celery.*beat' >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Flower Dashboard
   flower:
@@ -73,11 +91,19 @@ services:
       - backend
     restart: always
     depends_on:
-      - rabbitmq
-      - celery-worker
+      rabbitmq:
+        condition: service_healthy
+      celery-worker:
+        condition: service_healthy
     env_file:
       - ./env/.env.app
-    command: ["python", "-m", "celery", "-A", "celery_app", "flower", "--conf=flowerconfig.py"]
+    command: ["python", "-m", "celery", "-A", "celery_app", "flower", "--conf=FlowerConfig.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:5555 >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Ngnix reverse proxy
   nginx:
@@ -88,7 +114,8 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
-      - fastapi
+      fastapi:
+        condition: service_healthy
     networks:
       - backend
     restart: always
@@ -106,7 +133,7 @@ services:
       - backend
     restart: always
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-rag_app_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -227,11 +254,11 @@ services:
       - backend
     restart: always
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD:-RAG_APP_PWD}\" ping | grep -q PONG"]
       timeout: 30s
       retries: 5
       start_period: 30s
-    command: ["redis-server" , "--appendonly", "yes" , "--requirepass","${REDIS_PASSWORD:-RAG_APP_PWD}"]
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$${REDIS_PASSWORD:-RAG_APP_PWD}\""]
 networks:
   backend:
     driver: bridge

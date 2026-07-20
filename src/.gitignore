@@ -1,1 +1,11 @@
 .env
+assets/files/**
+!assets/files/.gitkeep
+assets/vector_dbs/**
+!assets/vector_dbs/.gitkeep
+celerybeat-schedule*
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+*.py[cod]

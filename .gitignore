@@ -129,7 +129,19 @@ __pypackages__/
 
 # Celery stuff
 celerybeat-schedule
+celerybeat-schedule.*
 celerybeat.pid
+*.db
+*.sqlite
+*.sqlite3
+
+# RAG app local/generated data
+src/assets/files/**
+!src/assets/files/.gitkeep
+src/assets/vector_dbs/**
+!src/assets/vector_dbs/.gitkeep
+assets/files/**
+assets/vector_dbs/**
 
 # Redis
 *.rdb
@@ -148,6 +160,9 @@ activemq-data/
 *.sage.py
 
 # Environments
+.env
+.env.*
+!.env.example
 .venv
 # env/
 venv/

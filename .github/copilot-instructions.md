@@ -1,53 +1,27 @@
 ## Purpose
-This file gives short, actionable guidance to AI coding agents working on this repository so they can be productive immediately.
+This file gives short, actionable guidance to AI coding agents working on this FastAPI/Celery RAG application.
 
-## Repo snapshot (discovered)
-- `README.md` — high-level project description (one-line, contains typos).
-- `.LICENSE` — license file present.
-- `.gitignore` — git ignore rules.
+## Repo snapshot
+- Root docs/config: `README.md`, `Docs/RunCommands.md`, `.gitignore`, Docker files under `docker/`.
+- Application source: `src/` contains FastAPI routes/controllers, Celery tasks, SQLAlchemy models/Alembic files, LLM providers, and vector DB providers.
+- Python tooling lives in `src/pyproject.toml`, `src/requirements.txt`, and `src/uv.lock`.
+- Agent context lives in `.pi/prompts/PI_Instructions.md`; read it before making broad changes.
 
-Current README excerpt (line 2):
-```
-This is a copmerhensive rag app with pwoer of llm
-```
+## High-priority tasks
+1. Keep local/generated data out of git: `.env`, uploaded files, local vector DB files, sqlite/db artifacts, Celery beat schedules, and `__pycache__`.
+2. Prefer small fixes with regression tests for processing/indexing, Qdrant/PGVector providers, LLM providers, and route validation.
+3. Reconcile docs when changing runtime behavior; current local run commands are centered on `src/` and port `8000`.
 
-Suggested quick fix (one-line):
-"This is a comprehensive RAG app powered by an LLM."
-
-## High-priority tasks for an AI agent
-1. Fix obvious documentation issues first. Update `README.md` to correct typos and expand the one-line description so humans know expected language/runtime.
-   - Example edit: replace the exact line above with the suggested sentence.
-2. Detect the project language and tooling. There are currently no manifest files (e.g., `package.json`, `pyproject.toml`, `requirements.txt`, `Pipfile`, or `go.mod`) in the repo root — confirm by searching (commands below).
-3. If the user expects a RAG implementation, propose a minimal scaffold and create it only after confirmation: `src/`, `ingest/`, `vectorstore/`, `api/`, `tests/`, and a minimal `README` usage section.
-
-## How to discover build / test / run commands (do this before making assumptions)
-Run these in the repo root to locate common manifests and CI configs:
+## Discovery and validation commands
 ```zsh
-ls -la
-grep -R "package.json\|pyproject.toml\|requirements.txt\|Pipfile\|go.mod\|Dockerfile\|Makefile" -n || true
-ls .github || true
+find . -maxdepth 3 -type f | sort
+cd src && uv run pytest
+cd src && uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+cd src && python -m celery -A celery_app worker -Q default,file_processing_queue,data_indexing_queue,log_retention_queue --loglevel=info
 ```
 
-If CI exists under `.github/workflows`, read workflow files for build/test steps and tool versions.
-
-## Project-specific notes (what an agent should assume from current contents)
-- No source code found in the repository root — treat this as a documentation-first repo until more files are added.
-- Because the repository title is "RAG APP", prefer suggesting RAG-relevant scaffolding (ingestion -> vector store -> LLM client -> API/UI) but do not implement it without user confirmation.
-
-## Conventions and patterns to follow when adding code
-- Use a single top-level language/environment. Ask the owner which language they want (Python or Node.js are common for RAG apps).
-- If scaffolding Python: create `pyproject.toml` or `requirements.txt`, a `src/` package, a `scripts/` entrypoint, and a `tests/` folder using `pytest`.
-- If scaffolding Node.js: create `package.json`, `src/`, and `tests/` with `vitest` or `jest` depending on user preference.
-
-## Pull request and commit guidance
-- Make small, focused commits. When fixing docs, one commit that updates `README.md` is sufficient.
-- Include a short changelog entry in `README.md` or `CHANGELOG.md` when adding project scaffolding.
-
-## When you need clarification
-- If manifests or source code are missing, ask the user: "Which language/runtime do you want for this RAG app?" and "Do you want me to scaffold a minimal project now?"
-
-## Why these instructions matter
-They keep the agent from guessing at the build system or inserting an opinionated scaffold without confirmation. The repo currently only contains documentation and metadata, so the highest value is small, verifiable changes (docs fixes) and discovery steps.
-
----
-If any of these points are unclear or you want a different starting task (scaffold Python/Node, add CI, or implement an ingestion example), tell me which and I will proceed.
+## Conventions
+- Use async/await consistently for FastAPI, SQLAlchemy, and provider interfaces.
+- Preserve typo-based public/config names with aliases when renaming incrementally (`FILE_ALLWOED_TYPES`, `FILE_ALLOWED_SZIE`, etc.).
+- Keep prompt text in `src/stores/llm/Templates/locales/`.
+- Pull settings from `src/helpers/config.py` and `.env` examples rather than hardcoding provider/model/vector values.

@@ -4,7 +4,7 @@ This is a minimal implementation of the RAG model for question answering.
 
 ## Requirements
 
-- Python 3.10
+- Python 3.13+ (matches `src/pyknowledge_base.toml`)
 
 #### Install Dependencies
 ```bash
@@ -17,7 +17,7 @@ sudo apt install libpq-dev gcc python3-dev
 1) Download and install MiniConda from [here](https://docs.anaconda.com/free/miniconda/#quick-command-line-install)
 2) Create a new environment using the following command:
 ```bash
-$ conda create -n mini-rag python=3.10
+$ conda create -n mini-rag python=3.13
 ```
 3) Activate the environment:
 ```bash
@@ -39,7 +39,9 @@ export PS1="\[\033[01;32m\]\u@\h:\w\n\[\033[00m\]\$ "
 ### Install the required packages
 
 ```bash
-$ pip install -r requirements.txt
+$ cd src
+$ uv sync
+# or: pip install -r requirements.txt
 ```
 
 ### Setup the environment variables
@@ -51,7 +53,8 @@ $ cp .env.example .env
 ### Run Alembic Migration
 
 ```bash
-$ alembic upgrade head
+$ cd src
+$ alembic upgrade heads
 ```
 
 Set your environment variables in the `.env` file. Like `OPENAI_API_KEY` value.
@@ -82,7 +85,8 @@ $ sudo docker compose up -d
 ## Run the FastAPI server (Development Mode)
 
 ```bash
-$ uvicorn main:app --reload --host 0.0.0.0 --port 5000
+$ cd src
+$ uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 # Celery (Development Mode)
@@ -92,7 +96,8 @@ For development, you can run Celery services manually instead of using Docker:
 To Run the **Celery worker**, you need to run the following command in a separate terminal:
 
 ```bash
-$ python -m celery -A celery_app worker --queues=default,file_processing,data_indexing --loglevel=info
+$ cd src
+$ python -m celery -A celery_app worker -Q default,file_processing_queue,data_indexing_queue,log_retention_queue --loglevel=info
 ```
 
 To run the **Beat scheduler**, you can run the following command in a separate terminal:
@@ -104,7 +109,8 @@ $ python -m celery -A celery_app beat --loglevel=info
 To Run **Flower Dashboard**, you can run the following command in a separate terminal:
 
 ```bash
-$ python -m celery -A celery_app flower --conf=flowerconfig.py
+$ cd src
+$ python -m celery -A celery_app flower --conf=FlowerConfig.py
 ```
 
 

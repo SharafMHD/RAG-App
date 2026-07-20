@@ -13,11 +13,12 @@ class QdrantDBProvider(VectorDBInterface):
         self.default_distance_method = None
         self.default_vector_size = default_vector_size
 
-        if default_distance_method == DistanceMethodEnums.COSINE.value:
+        normalized_distance_method = (default_distance_method or DistanceMethodEnums.COSINE.value).upper()
+        if normalized_distance_method == DistanceMethodEnums.COSINE.value:
             self.distance_method = models.Distance.COSINE
-        elif default_distance_method == DistanceMethodEnums.EUCLIDEAN.value:
+        elif normalized_distance_method == DistanceMethodEnums.EUCLIDEAN.value:
             self.distance_method = models.Distance.EUCLIDEAN
-        elif default_distance_method == DistanceMethodEnums.DOT.value:
+        elif normalized_distance_method == DistanceMethodEnums.DOT.value:
             self.distance_method = models.Distance.DOT
         else:
             logging.error(f"Unsupported distance method: {default_distance_method}")
@@ -35,8 +36,12 @@ class QdrantDBProvider(VectorDBInterface):
             return False
 
     async def disconnect(self):
+        if self.client is not None:
+            close = getattr(self.client, "close", None)
+            if callable(close):
+                close()
         self.client = None
-        raise NotImplementedError("Disconnect method is not required for QdrantDB local instance.")
+        return True
 
     async def is_collection_exists(self, collection_name: str) -> bool:
         return self.client.collection_exists(collection_name)
@@ -53,22 +58,22 @@ class QdrantDBProvider(VectorDBInterface):
 
     async def create_collection(self, collection_name: str, embedding_size: int, do_reset: bool = False):
         # Check if collection exists and matches embedding size
-        if self.is_collection_exists(collection_name):
-            info = self.get_collection_info(collection_name)
+        if await self.is_collection_exists(collection_name):
+            info = await self.get_collection_info(collection_name)
             existing_size = info.config.params.vectors.size
             if existing_size != embedding_size:
                 self.logger.warning(f"Vector dimension mismatch: collection expects {existing_size}, got {embedding_size}. Dropping and recreating collection.")
-                self.drop_collection(collection_name)
+                await self.drop_collection(collection_name)
                 do_reset = True  # force reset after drop
             else:
                 if do_reset:
-                    self.drop_collection(collection_name)
+                    await self.drop_collection(collection_name)
                     do_reset = True  # force reset after drop
                 else:
                     self.logger.info(f"Collection {collection_name} already exists with correct size {embedding_size}. Skipping creation.")
                     return False
 
-        if not self.is_collection_exists(collection_name) or do_reset:
+        if not await self.is_collection_exists(collection_name) or do_reset:
             self.logger.info(f"Creating Qdrant collection '{collection_name}' with vector size {embedding_size} and distance method {self.distance_method}")
             self.client.create_collection(
                 collection_name=collection_name,
@@ -91,7 +96,7 @@ class QdrantDBProvider(VectorDBInterface):
         return False
 
     async def insert_one_vector(self, collection_name: str, text: str, vector: list, record_id: int = None, metadata: dict = None):
-        if not self.is_collection_exists(collection_name):
+        if not await self.is_collection_exists(collection_name):
             self.logger.error(f"Collection {collection_name} does not exist.")
             return False
 
@@ -101,7 +106,7 @@ class QdrantDBProvider(VectorDBInterface):
 
         try:
             record = models.Record(
-                id=record_id,
+                id=record_id if isinstance(record_id, int) else str(record_id),
                 vector=vector,
                 payload={
                     "text": text,
@@ -120,7 +125,7 @@ class QdrantDBProvider(VectorDBInterface):
             return False
 
     async def insert_many_vectors(self, collection_name: str, texts: list, vectors: list, metadata: list = None, record_ids: list = None, batch_size: int = 100):
-        if not self.is_collection_exists(collection_name):
+        if not await self.is_collection_exists(collection_name):
             self.logger.error(f"Collection {collection_name} does not exist.")
             return False
 
@@ -140,7 +145,7 @@ class QdrantDBProvider(VectorDBInterface):
             for idx in range(len(batch_texts)):
                 batch_records.append(
                     models.Record(
-                        id=batch_record_ids[idx],
+                        id=batch_record_ids[idx] if isinstance(batch_record_ids[idx], int) else str(batch_record_ids[idx]),
                         vector=batch_vectors[idx],
                         payload={
                             "text": batch_texts[idx],

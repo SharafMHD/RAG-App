@@ -10,6 +10,7 @@ from stores.llm import LLMProvideFactory
 from stores.vectordb import VectorDBProviderFactory
 from stores.llm.Templates.template_parser import TemplateParser
 from utils.metrics import setup_metrics_endpoint
+from utils.security import setup_security
 
 
 @asynccontextmanager
@@ -73,6 +74,9 @@ async def lifespan(app: FastAPI):
 
 # Create the FastAPI application instance with the defined lifespan context manager
 app = FastAPI(lifespan=lifespan)
+app_settings = get_settings()
+# Setup security middleware before routes are added
+setup_security(app, app_settings)
 # Setup the metrics endpoint for Prometheus or other monitoring tools
 setup_metrics_endpoint(app)
 # Include routers for different API endpoints

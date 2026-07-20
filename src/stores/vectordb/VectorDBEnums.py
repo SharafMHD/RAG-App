@@ -20,7 +20,7 @@ class PGVectorTableSchemaEnums(str, Enum):
 class PGVectorDistanceMethodEnums(str, Enum):
     COSINE = "vector_cosine_ops"
     EUCLIDEAN = "vector_l2_ops"
-    DOT = "vector_l2_ops"
+    DOT = "vector_ip_ops"
 
 class PGVectorIndexTypeEnums(str, Enum):
     IVFFLAT = "ivfflat"

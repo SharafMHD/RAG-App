@@ -98,7 +98,7 @@ celery_app.conf.update(
     worker_cancel_long_running_tasks_on_connection_loss=True,
 
     task_routes={
-        "tasks.file_processing.process_project_files": {"queue": "file_processing_queue"},
+        "tasks.file_processing.process_knowledge_base_files": {"queue": "file_processing_queue"},
         "tasks.data_indexing.index_data_content": {"queue": "data_indexing_queue"},
         "tasks.process_workflow.process_and_index_workflow": {"queue": "file_processing_queue"},
         "tasks.celery_log_retention.clean_celery_task_executions": {"queue": "log_retention_queue"}
@@ -111,7 +111,7 @@ celery_app.conf.update(
             "args": (30,),
         }
     },
-    timezone="asia/dubai"
+    timezone="Asia/Dubai"
 )
 
 celery_app.conf.task_default_queue = "default"

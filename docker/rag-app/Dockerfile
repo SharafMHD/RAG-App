@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.11.21-python3.12-trixie
+FROM ghcr.io/astral-sh/uv:0.11.21-python3.13-trixie
 
 WORKDIR /app
 

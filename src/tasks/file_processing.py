@@ -6,7 +6,8 @@ from helpers.config import get_settings
 from celery_app import celery_app, get_setup_utilites
 from models.AssetModel import AssetModel
 from models.ChunksDataModel import ChunkDataModel
-from models.ProjectDataModel import ProjectDataModel
+from models.KnowledgeBaseDataModel import KnowledgeBaseDataModel
+from models.db_schemes import DataChunk
 from models.enums.AssetTypeEnum import AssetTypeEnum
 from models.enums.ResponseEnums import ResponseStatus
 from controllers import NLPController, ProcessFileController
@@ -17,24 +18,24 @@ logger = logging.getLogger("celery.task")
 
 @celery_app.task(
     bind=True,
-    name="tasks.file_processing.process_project_files",
+    name="tasks.file_processing.process_knowledge_base_files",
     acks_late=True,
     reject_on_worker_lost=True,
     time_limit=3600,
     soft_time_limit=3500,
 )
-def process_project_files(
+def process_knowledge_base_files(
     self,
-    project_id: UUID,
+    knowledge_base_id: UUID,
     file_id: str | None,
     chunk_size: int,
     overlap_size: int,
     do_reset: bool = False,
 ):
     return asyncio.run(
-        _process_project_files(
+        _process_knowledge_base_files(
             task_instance=self,
-            project_id=project_id,
+            knowledge_base_id=knowledge_base_id,
             file_id=file_id,
             chunk_size=chunk_size,
             overlap_size=overlap_size,
@@ -43,8 +44,8 @@ def process_project_files(
     )
 
 
-async def _process_project_files(
-    task_instance, project_id, file_id, chunk_size, overlap_size, do_reset
+async def _process_knowledge_base_files(
+    task_instance, knowledge_base_id, file_id, chunk_size, overlap_size, do_reset
 ):
     # Setup utilities asynchronously
     (
@@ -58,11 +59,11 @@ async def _process_project_files(
         template_parser,
     ) = await get_setup_utilites()
 
-    project_model = await ProjectDataModel.create_instance(db_client=db_client)
+    knowledge_base_model = await KnowledgeBaseDataModel.create_instance(db_client=db_client)
     idempotency_manager = IdempotencyManager(db_client=db_client, db_engine=db_engine)
 
     task_args = {
-        "project_id": str(project_id),
+        "knowledge_base_id": str(knowledge_base_id),
         "file_id": str(file_id) if file_id else None,
         "chunk_size": chunk_size,
         "overlap_size": overlap_size,
@@ -91,7 +92,7 @@ async def _process_project_files(
     try:
         celery_uuid = UUID(task_instance.request.id)
     except ValueError:
-        celery_uuid = project_id  
+        celery_uuid = knowledge_base_id  
 
     if existing_execution:
         task_record = await idempotency_manager.update_task_execution_status(
@@ -115,7 +116,7 @@ async def _process_project_files(
 
     # Master pipeline error tracking boundary
     try:
-        project = await project_model.get_project_or_create(project_id)
+        knowledge_base = await knowledge_base_model.get_knowledge_base_or_create(knowledge_base_id)
         nlp_controller = NLPController(
             vector_db_client=vector_db_client,
             generation_client=generation_client,
@@ -125,19 +126,19 @@ async def _process_project_files(
 
         chunk_model = await ChunkDataModel.create_instance(db_client=db_client)
         asset_model = await AssetModel.create_instance(db_client=db_client)
-        process_file_controller = ProcessFileController(project.project_id)
+        process_file_controller = ProcessFileController(knowledge_base.knowledge_base_id)
 
-        project_files = {}
+        knowledge_base_files = {}
 
         if file_id:
-            asset_record = await asset_model.get_asset_by_name_and_projectid(
-                file_id, project.project_id
+            asset_record = await asset_model.get_asset_by_name_and_knowledge_baseid(
+                file_id, knowledge_base.knowledge_base_id
             )
             if not asset_record:
                 error_meta = {
                     "status": False,
                     "file_id": str(file_id),
-                    "project_id": str(project_id),
+                    "knowledge_base_id": str(knowledge_base_id),
                     "message": ResponseStatus.ASSET_NOT_FOUND_ERROR.value,
                 }
                 task_instance.update_state(state="FAILURE", meta=error_meta)
@@ -148,47 +149,47 @@ async def _process_project_files(
                     result=error_meta,
                 )
                 raise FileNotFoundError(
-                    f"File '{file_id}' not found in project '{project_id}'."
+                    f"File '{file_id}' not found in knowledge_base '{knowledge_base_id}'."
                 )
 
-            project_files = {asset_record.asset_id: asset_record.asset_name}
+            knowledge_base_files = {asset_record.asset_id: asset_record.asset_name}
         else:
-            assets = await asset_model.get_all_assets_by_project(
-                project.project_id, AssetTypeEnum.File.value
+            assets = await asset_model.get_all_assets_by_knowledge_base(
+                knowledge_base.knowledge_base_id, AssetTypeEnum.File.value
             )
-            project_files = {asset.asset_id: asset.asset_name for asset in assets}
+            knowledge_base_files = {asset.asset_id: asset.asset_name for asset in assets}
 
-        if not project_files:
-            raise FileNotFoundError(f"No files found in project '{project_id}'.")
+        if not knowledge_base_files:
+            raise FileNotFoundError(f"No files found in knowledge_base '{knowledge_base_id}'.")
 
         if do_reset:
             collection_name = await nlp_controller.create_collection_name(
-                str(project.project_id)
+                str(knowledge_base.knowledge_base_id)
             )
             await vector_db_client.drop_collection(collection_name)
-            await chunk_model.delete_chunks_by_project(str(project.project_id))
+            await chunk_model.delete_chunks_by_knowledge_base(str(knowledge_base.knowledge_base_id))
 
         inserted_chunks_count = 0
         number_of_processed_files = 0
         number_of_skipped_files = 0
-        total_files = len(project_files)
+        total_files = len(knowledge_base_files)
 
         # Sequential file operations loop
         for file_number, (asset_id, asset_name) in enumerate(
-            project_files.items(), start=1
+            knowledge_base_files.items(), start=1
         ):
             logger.info(
-                "Processing file '%s' (ID: '%s') in project '%s'.",
+                "Processing file '%s' (ID: '%s') in knowledge_base '%s'.",
                 asset_name,
                 asset_id,
-                project_id,
+                knowledge_base_id,
             )
 
             task_instance.update_state(
                 state="PROCESSING",
                 meta={
                     "status": True,
-                    "project_id": str(project_id),
+                    "knowledge_base_id": str(knowledge_base_id),
                     "file_id": str(asset_id),
                     "filename": asset_name,
                     "current_file": file_number,
@@ -209,9 +210,27 @@ async def _process_project_files(
                 logger.warning("Skipped file '%s' due to empty content.", asset_name)
                 continue
 
-            # --- Placeholder for extraction/vectorizing work ---
-            # chunks = await nlp_controller.chunk_and_embed(file_content, chunk_size, overlap_size)
-            # inserted_chunks_count += len(chunks)
+            chunks = process_file_controller.process_file(
+                file_content=file_content,
+                chunk_size=chunk_size,
+                overlap_size=overlap_size,
+            )
+            if not chunks:
+                number_of_skipped_files += 1
+                logger.warning("Skipped file '%s' because no chunks were produced.", asset_name)
+                continue
+
+            data_chunks = [
+                DataChunk(
+                    chunk_asset_id=asset_id,
+                    chunk_knowledge_base_id=knowledge_base.knowledge_base_id,
+                    chunk_content=chunk.page_content,
+                    chunk_metadata=chunk.metadata,
+                    chunk_order=chunk_order,
+                )
+                for chunk_order, chunk in enumerate(chunks, start=1)
+            ]
+            inserted_chunks_count += await chunk_model.bulk_insert_data_chunks(data_chunks)
             number_of_processed_files += 1
 
         # Execution finished successfully
@@ -219,6 +238,8 @@ async def _process_project_files(
             "status": True,
             "processed_files": number_of_processed_files,
             "skipped_files": number_of_skipped_files,
+            "knowledge_base_id": str(knowledge_base.knowledge_base_id),
+            "do_reset": do_reset,
             "inserted_chunks": inserted_chunks_count,
         }
         await idempotency_manager.update_task_execution_status(
@@ -237,3 +258,11 @@ async def _process_project_files(
                 result={"error": str(exc)},
             )
         raise exc
+    finally:
+        try:
+            if vector_db_client is not None:
+                await vector_db_client.disconnect()
+            if db_engine is not None:
+                await db_engine.dispose()
+        except Exception:
+            logger.exception("An error occurred while cleaning up resources for knowledge_base '%s'.", knowledge_base_id)

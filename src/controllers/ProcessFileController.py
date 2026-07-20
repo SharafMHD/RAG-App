@@ -1,5 +1,5 @@
 from .BaseController import BaseController
-from .ProjectController import ProjectController
+from .KnowledgeBaseController import KnowledgeBaseController
 import os
 from sqlalchemy.dialects.postgresql import UUID
 from models.enums.ProcessFileEnums import ProcessFileEnums
@@ -15,24 +15,24 @@ class ProcessedDocument:
 
 class ProcessFileController(BaseController):
 
-    def __init__(self , project_id: UUID):
+    def __init__(self , knowledge_base_id: UUID):
         super().__init__()
-        self.project_controller = ProjectController()
-        self.project_id = project_id
-        self.project_path = self.project_controller.get_project_path(project_id)
+        self.knowledge_base_controller = KnowledgeBaseController()
+        self.knowledge_base_id = knowledge_base_id
+        self.knowledge_base_path = self.knowledge_base_controller.get_knowledge_base_path(knowledge_base_id)
     
     def get_file_extension(self, file_id: str) -> str:
         return os.path.splitext(file_id)[1].lower()
 
     def get_file_loader(self, file_id: str):
         file_extension = self.get_file_extension(file_id)
-        file_path = os.path.join(self.project_path, file_id)
+        file_path = os.path.join(self.knowledge_base_path, file_id)
         if not os.path.exists(file_path):
-            raise None
+            raise FileNotFoundError(f"File not found: {file_path}")
         
         if file_extension == ProcessFileEnums.TXT.value:
             return TextLoader(file_path, encoding='utf-8')
-        elif file_extension == ProcessFileEnums.PDF:
+        elif file_extension == ProcessFileEnums.PDF.value:
             return PyMuPDFLoader(file_path)
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
@@ -61,43 +61,32 @@ class ProcessFileController(BaseController):
         #     file_content_text,
         #     metadatas=file_content_metadata
         # )
-        chunks= self.process_doc_simple_splitter(file_content_text, chunk_size, file_content_metadata)
+        chunks= self.process_doc_simple_splitter(file_content_text, chunk_size, file_content_metadata, overlap_size=overlap_size)
         return chunks
     
-    def process_doc_simple_splitter( self,text: List[str],chunk_size: int,metadata: List[dict],spliiter_tag: str = "\n") -> List[ProcessedDocument]:
-        full_text = " ".join(text)
+    def process_doc_simple_splitter(self, text: List[str], chunk_size: int, metadata: List[dict], spliiter_tag: str = "\n", overlap_size: int = 0) -> List[ProcessedDocument]:
+        full_text = spliiter_tag.join(doc.strip() for doc in text if doc and doc.strip())
+        if not full_text:
+            return []
 
-        # Split the full text into chunks
-        lines = [
-            doc.strip()
-            for doc in full_text.split(spliiter_tag)
-            if len(doc.strip()) > 1
-        ]
-
+        chunk_size = max(1, int(chunk_size))
+        overlap_size = max(0, min(int(overlap_size or 0), chunk_size - 1))
         chunks = []
-        current_chunk = ""
+        start = 0
 
-        for line in lines:
-            current_chunk += line + spliiter_tag
-
-            if len(current_chunk) >= chunk_size:
+        while start < len(full_text):
+            end = min(start + chunk_size, len(full_text))
+            chunk_text = full_text[start:end].strip()
+            if chunk_text:
                 chunks.append(
                     ProcessedDocument(
-                        page_content=current_chunk.strip(),
-                        metadata=metadata
+                        page_content=chunk_text,
+                        metadata={"source_documents": metadata}
                     )
                 )
-
-                current_chunk = ""
-
-        # Add remaining chunk
-        if current_chunk:
-            chunks.append(
-                ProcessedDocument(
-                    page_content=current_chunk.strip(),
-                    metadata=metadata
-                )
-            )
+            if end >= len(full_text):
+                break
+            start = end - overlap_size
 
         return chunks
                 

@@ -11,7 +11,7 @@ class DataChunk(SQLAlchemyBase):
 
     chunk_id = Column(UUID(as_uuid=True), primary_key=True, index=True, default=uuid.uuid4, unique=True, nullable=False)
     chunk_asset_id = Column(UUID(as_uuid=True), ForeignKey("assets.asset_id"), nullable=False)  # Foreign key to assets.asset_id
-    chunk_project_id = Column(UUID(as_uuid=True), ForeignKey("projects.project_id"), nullable=False)  # Foreign key to projects.project_id
+    chunk_knowledge_base_id = Column(UUID(as_uuid=True), ForeignKey("knowledge_bases.knowledge_base_id"), nullable=False)  # Foreign key to knowledge_bases.knowledge_base_id
 
     chunk_content = Column(String, nullable=False)  # Store the actual content of the chunk
     chunk_metadata = Column(JSONB, nullable=True)  # Store metadata as JSON
@@ -23,15 +23,15 @@ class DataChunk(SQLAlchemyBase):
 
     # define asset relationship
     asset = relationship("Asset", back_populates="data_chunks")
-    # define project relationship
-    project = relationship("Project", back_populates="data_chunks")
+    # define knowledge_base relationship
+    knowledge_base = relationship("KnowledgeBase", back_populates="data_chunks")
 
     # define indexes
     __table_args__ = (
         # Index on chunk_asset_id for faster lookups      
         Index("chunk_asset_id_index", "chunk_asset_id"),
-        # Index on chunk_project_id for faster lookups       
-         Index("chunk_project_id_index", "chunk_project_id"),
+        # Index on chunk_knowledge_base_id for faster lookups       
+         Index("chunk_knowledge_base_id_index", "chunk_knowledge_base_id"),
     )
 
 class RetrievedDocuments(BaseModel):

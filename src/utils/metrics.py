@@ -37,6 +37,8 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 def setup_metrics_endpoint(app: FastAPI):
     app.add_middleware(PrometheusMiddleware)
 
-    @app.get("/metrics24", include_in_schema=False)
-    async def metrics():
+    async def metrics_response():
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+    app.add_api_route("/metrics", metrics_response, methods=["GET"], include_in_schema=False)
+    app.add_api_route("/metrics24", metrics_response, methods=["GET"], include_in_schema=False)

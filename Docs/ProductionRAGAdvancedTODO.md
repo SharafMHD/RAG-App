@@ -7,8 +7,12 @@ This document captures the advanced RAG production-readiness plan for this app, 
 
 ## Completed Sprint Documentation
 
+Each completed sprint has its own separate documentation file:
+
+- [x] [Sprint 0 — Baseline and Contracts](Sprint0BackendContracts.md)
 - [x] [Sprint 1 — Evaluation Foundation](Sprint1EvaluationFoundation.md)
 - [x] [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md)
+- [x] [Sprint 3 — Prompting, Langfuse, and Structured Answers](Sprint3PromptingLangfuseStructuredAnswers.md)
 
 ---
 
@@ -421,9 +425,20 @@ Priority: **High**
 
 # Suggested Implementation Sprints
 
+## Completed sprint documents
+
+Each completed sprint has its own separate documentation file:
+
+- [Sprint 0 — Baseline and Contracts](Sprint0BackendContracts.md)
+- [Sprint 1 — Evaluation Foundation](Sprint1EvaluationFoundation.md)
+- [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md)
+- [Sprint 3 — Prompting, Langfuse, and Structured Answers](Sprint3PromptingLangfuseStructuredAnswers.md)
+
+---
+
 ## Sprint 0 — Baseline and Contracts ✅ Completed
 
-Goal: define stable backend/frontend contracts before adding advanced features.
+Goal: define stable backend/frontend contracts before adding advanced features. See [Sprint 0 — Baseline and Contracts](Sprint0BackendContracts.md).
 
 - [x] Review current ingestion, retrieval, and answer endpoints.
 - [x] Define final chat API response schema:
@@ -443,7 +458,7 @@ Exit criteria: current backend flow is documented and the future Next.js UI know
 
 ## Sprint 1 — Evaluation Foundation ✅ Completed
 
-Goal: create measurement before changing retrieval quality.
+Goal: create measurement before changing retrieval quality. See [Sprint 1 — Evaluation Foundation](Sprint1EvaluationFoundation.md).
 
 - [x] Create golden dataset:
   - question
@@ -488,19 +503,19 @@ Exit criteria met for Sprint 2 foundation: vector, BM25, and hybrid retrieval ca
 
 ---
 
-## Sprint 3 — Prompting, Langfuse, and Structured Answers
+## Sprint 3 — Prompting, Langfuse, and Structured Answers ✅ Completed
 
-Goal: make answers grounded, traceable, versioned, and frontend-friendly.
+Goal: make answers grounded, traceable, versioned, and frontend-friendly. See [Sprint 3 — Prompting, Langfuse, and Structured Answers](Sprint3PromptingLangfuseStructuredAnswers.md).
 
-- [ ] Connect backend to Langfuse.
-- [ ] Move production prompts into Langfuse prompt management.
-- [ ] Add prompt version tracking per answer.
-- [ ] Add citation-required system prompt.
-- [ ] Add no-answer behavior when context is insufficient.
-- [ ] Add structured Pydantic response schema.
-- [ ] Trace query, retrieval, reranking, final prompt, answer, latency, and cost in Langfuse.
+- [x] Connect backend to Langfuse.
+- [x] Move production prompts into Langfuse prompt management with local fallback.
+- [x] Add prompt version/source tracking per answer.
+- [x] Add citation-required system prompt.
+- [x] Add no-answer behavior when context is insufficient.
+- [x] Add structured Pydantic generated-answer validation schema.
+- [x] Trace query, retrieval context, final prompt, answer, and metadata in Langfuse when enabled.
 
-Exit criteria: each answer has citations, structured output, and a Langfuse trace ID.
+Exit criteria: each answer has citations/validated no-answer behavior, structured output, and a Langfuse/local trace ID.
 
 ---
 

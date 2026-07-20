@@ -45,6 +45,9 @@ class RetrievalMetadata(BaseModel):
     bm25_top_k: int | None = None
     rerank_top_n: int | None = None
     min_relevance_score: float | None = None
+    prompt_name: str | None = None
+    prompt_version: str | None = None
+    prompt_source: str | None = None
 
 
 class ChatAnswerResponse(BaseModel):

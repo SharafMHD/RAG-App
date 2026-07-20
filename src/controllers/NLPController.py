@@ -3,6 +3,8 @@ from models.db_schemes import KnowledgeBase , DataChunk, RetrievedDocuments
 from stores.llm.LLMEnums import DocumentTypeEums
 from stores.retrieval import reciprocal_rank_fusion
 from helpers.config import get_settings, Settings
+from services.langfuse_service import LangfuseService
+from services.prompt_service import PromptService
 from sqlalchemy import select
 from typing import List
 from uuid import UUID
@@ -10,7 +12,7 @@ import json
 import math
 import re
 class NLPController(BaseController):
-    def __init__(self,vector_db_client, generation_client,embedding_client, template_parser, db_client=None, settings: Settings | None = None):
+    def __init__(self,vector_db_client, generation_client,embedding_client, template_parser, db_client=None, settings: Settings | None = None, prompt_service: PromptService | None = None, langfuse_service: LangfuseService | None = None):
         super().__init__()
 
         self.vector_db_client = vector_db_client
@@ -19,6 +21,8 @@ class NLPController(BaseController):
         self.template_parser = template_parser
         self.db_client = db_client
         self.settings = settings or get_settings()
+        self.langfuse_service = langfuse_service or LangfuseService(self.settings)
+        self.prompt_service = prompt_service or PromptService(self.settings, self.langfuse_service)
 
     async def create_collection_name(self, knowledge_base_id:UUID):
         collection_name = f"collection_{self.vector_db_client.default_vector_size}_{knowledge_base_id}".strip().replace(" ","_").lower()
@@ -193,7 +197,7 @@ class NLPController(BaseController):
     
     async def answer_rag_query(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10, strategy: str | None = None):
         
-        answer, full_prompt, chat_history, retrieved_documents = None, None, None, []
+        answer, full_prompt, chat_history, retrieved_documents, prompt_bundle = None, None, None, [], None
         #Step 1: Search index for relevant documents
         retrieved_documents  = await self.search_index(
             knowledge_base= knowledge_base,
@@ -203,24 +207,23 @@ class NLPController(BaseController):
         )
         
         if not retrieved_documents or len(retrieved_documents) == 0:
-            return answer, full_prompt, chat_history, retrieved_documents
+            return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
         
-        # step2: Construct LLM prompt
-        system_prompt = self.template_parser.get_template_module("rag", "system_prompt")
+        # step2: Construct grounded, citation-required LLM prompt
+        prompt_bundle = self.prompt_service.get_rag_prompt(query_text=query_text)
+        system_prompt = prompt_bundle.system_prompt
 
         documents_prompts = "\n".join([
-            self.template_parser.get_template_module("rag", "document_prompt", {
-                "doc_num": idx + 1,
-                "chunk_text": self.generation_client.process_text(doc.text),
-            }) or ""
+            "\n".join([
+                f"## Source ID: source_{idx + 1}",
+                f"### Content: {self.generation_client.process_text(doc.text)}",
+            ])
             for idx, doc in enumerate(retrieved_documents)
         ])
 
-        footer_prompt = self.template_parser.get_template_module("rag", "footer_prompt", {
-            "query_text": query_text,
-        })
+        footer_prompt = prompt_bundle.footer_prompt
         if not system_prompt or not footer_prompt:
-            return answer, full_prompt, chat_history, retrieved_documents
+            return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
          # step3: Construct Generation Client Prompts
         chat_history = [
             self.generation_client.construct_prompt(
@@ -237,6 +240,6 @@ class NLPController(BaseController):
             chat_history=chat_history
         )
         
-        return answer, full_prompt, chat_history, retrieved_documents
+        return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
 
        

@@ -11,6 +11,8 @@ from stores.vectordb import VectorDBProviderFactory
 from stores.llm.Templates.template_parser import TemplateParser
 from utils.metrics import setup_metrics_endpoint
 from utils.security import setup_security
+from services.langfuse_service import LangfuseService
+from services.prompt_service import PromptService
 
 
 @asynccontextmanager
@@ -66,9 +68,12 @@ async def lifespan(app: FastAPI):
         language=app_settings.PRIMARY_LANGUAGE,
         default_language=app_settings.DEFAULT_LANGUAGE,
     )
+    app.langfuse_service = LangfuseService(app_settings)
+    app.prompt_service = PromptService(app_settings, app.langfuse_service)
 
     yield
 
+    app.langfuse_service.flush()
     await app.db_engine.dispose()
     await app.vector_db_client.disconnect()
 

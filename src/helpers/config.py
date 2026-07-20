@@ -82,10 +82,18 @@ class Settings(BaseSettings):
     CELERY_WORKER_CONCURRENCY: int = 2
     CELERY_FLOWER_PASSWORD: str | None = None
 
-    # Langfuse config
-    langfuse_secret_key: str | None = None
-    langfuse_public_key: str | None = None
-    langfuse_base_url: str | None = None
+    # Langfuse / prompting config
+    LANGFUSE_ENABLED: bool = False
+    langfuse_secret_key: str | None = Field(default=None, validation_alias=AliasChoices("LANGFUSE_SECRET_KEY", "langfuse_secret_key"))
+    langfuse_public_key: str | None = Field(default=None, validation_alias=AliasChoices("LANGFUSE_PUBLIC_KEY", "langfuse_public_key"))
+    langfuse_base_url: str | None = Field(default=None, validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL", "langfuse_base_url"))
+    LANGFUSE_ENVIRONMENT: str | None = None
+    LANGFUSE_RELEASE: str | None = None
+    LANGFUSE_TRACE_SAMPLE_RATE: float | None = 1.0
+    RAG_PROMPT_NAME: str = "rag-grounded-answer"
+    RAG_PROMPT_LABEL: str | None = "production"
+    REQUIRE_ANSWER_CITATIONS: bool = True
+    STRICT_CITATION_VALIDATION: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -134,6 +142,8 @@ class Settings(BaseSettings):
             raise ValueError("rate limit settings must be greater than 0")
         if min(self.VECTOR_TOP_K, self.BM25_TOP_K, self.HYBRID_TOP_N, self.RRF_K) <= 0:
             raise ValueError("retrieval top-k settings must be greater than 0")
+        if self.LANGFUSE_TRACE_SAMPLE_RATE is not None and not 0 <= self.LANGFUSE_TRACE_SAMPLE_RATE <= 1:
+            raise ValueError("LANGFUSE_TRACE_SAMPLE_RATE must be between 0 and 1")
         if self.REQUIRE_API_KEY and not self.API_KEY:
             raise ValueError("API_KEY must be set when REQUIRE_API_KEY=true")
         if self.ENVIRONMENT == "production":

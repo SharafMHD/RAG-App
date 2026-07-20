@@ -24,8 +24,11 @@ Create your environment files from the examples:
 cd docker/env
 cp .env.example.app .env.app
 cp .env.example.postgres .env.postgres
-cp .env.example.grafana .env.grafana
+cp .env.example.rabbitmq .env.rabbitmq
+cp .env.example.redis .env.redis
+cp .env.example.garfana .env.grafana
 cp .env.example.postgres-exporter .env.postgres-exporter
+cp .env.example.langfuse .env.langfuse
 
 # Setup the Alembic configuration for the FastAPI application if needed
 cd ..
@@ -39,11 +42,11 @@ cd docker
 docker compose up --build -d
 ```
 
-To validate or start the optional Langfuse stack, pass its env file explicitly because Docker Compose interpolation does not read `env_file` values:
+Langfuse observability is included in the main Compose stack. It reuses the existing `pgvector` PostgreSQL server through a dedicated `langfuse` database and reuses the existing `redis` service. Langfuse still runs its own ClickHouse and MinIO services.
 
 ```bash
-docker compose --env-file ./env/.env.langfuse -f docker-compose.langfuse.yml config --quiet
-docker compose --env-file ./env/.env.langfuse -f docker-compose.langfuse.yml up -d
+docker compose up -d langfuse-web langfuse-worker
+curl -fsS http://localhost:3001/api/public/health
 ```
 
 To start only specific services:

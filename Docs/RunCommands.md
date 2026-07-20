@@ -16,6 +16,7 @@ cp .env.example.rabbitmq .env.rabbitmq
 cp .env.example.redis .env.redis
 cp .env.example.garfana .env.grafana
 cp .env.example.postgres-exporter .env.postgres-exporter
+cp .env.example.langfuse .env.langfuse
 ```
 
 Edit the copied files and set real secrets/credentials before starting services.
@@ -77,13 +78,14 @@ To remove volumes too, only when you intentionally want to delete persisted data
 docker compose down -v --remove-orphans
 ```
 
-### 7. Optional Langfuse stack
+### 7. Langfuse observability
 
-Docker Compose interpolation requires passing the Langfuse env file explicitly:
+Langfuse is included in the main Docker Compose stack. It reuses the existing `pgvector` PostgreSQL server through a dedicated `langfuse` database and reuses the existing `redis` service. Langfuse still needs its own ClickHouse and MinIO services.
 
 ```bash
-docker compose --env-file ./env/.env.langfuse -f docker-compose.langfuse.yml config --quiet
-docker compose --env-file ./env/.env.langfuse -f docker-compose.langfuse.yml up -d
+cd docker
+docker compose up -d langfuse-web langfuse-worker
+curl -fsS http://localhost:3001/api/public/health
 ```
 
 ## Development

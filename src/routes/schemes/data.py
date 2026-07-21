@@ -4,8 +4,8 @@ from typing import Optional
 
 class ProcessRequest(BaseModel):
     file_id: str | None = None
-    chunk_size: Optional[int] = Field(default=512000, ge=1)
-    overlap_size: Optional[int] = Field(default=5120, ge=0)
+    chunk_size: Optional[int] = Field(default=900, ge=1)
+    overlap_size: Optional[int] = Field(default=150, ge=0)
     do_reset: Optional[bool] = False
 
 

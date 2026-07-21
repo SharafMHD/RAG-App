@@ -3,10 +3,11 @@ from .KnowledgeBaseController import KnowledgeBaseController
 import os
 from sqlalchemy.dialects.postgresql import UUID
 from models.enums.ProcessFileEnums import ProcessFileEnums
-from langchain_community.document_loaders import TextLoader,PyMuPDFLoader
-# from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import TextLoader
 from typing import List
 from dataclasses import dataclass
+from helpers.config import get_settings
+from services.document_processing import ChunkingConfig, PDFExtractor, PageAwareRecursiveChunker
 
 @dataclass
 class ProcessedDocument:
@@ -33,36 +34,45 @@ class ProcessFileController(BaseController):
         if file_extension == ProcessFileEnums.TXT.value:
             return TextLoader(file_path, encoding='utf-8')
         elif file_extension == ProcessFileEnums.PDF.value:
-            return PyMuPDFLoader(file_path)
+            return PDFExtractor()
         else:
             raise ValueError(f"Unsupported file type: {file_extension}")
     
     def get_document_content(self, file_id: str):
-        loader = self.get_file_loader( file_id)
+        loader = self.get_file_loader(file_id)
+        file_path = os.path.join(self.knowledge_base_path, file_id)
+        if isinstance(loader, PDFExtractor):
+            return loader.extract(file_path=file_path, document_name=file_id)
         if loader:
             documents = loader.load()
+            for index, document in enumerate(documents, start=1):
+                metadata = dict(getattr(document, "metadata", {}) or {})
+                metadata.update({
+                    "source": file_id,
+                    "document_name": file_id,
+                    "file_name": file_id,
+                    "page": metadata.get("page") or index,
+                    "page_number": metadata.get("page_number") or metadata.get("page") or index,
+                    "extractor": "text_loader_v1",
+                })
+                document.metadata = metadata
             return documents
         return None
 
-    def process_file(self, file_content: str, chunk_size: int=512000, overlap_size: int = 5120):
-        # text_splitter = RecursiveCharacterTextSplitter(
-        #     chunk_size=chunk_size,
-        #     chunk_overlap=overlap_size,
-        #     length_function=len,
-        #     separators=["\n\n", "\n", " ", ""]
-        # )
-        file_content_text=[
-            doc.page_content for doc in file_content
-        ]
-        file_content_metadata=[
-            doc.metadata for doc in file_content    
-        ]
-        # chuncks = text_splitter.create_documents(
-        #     file_content_text,
-        #     metadatas=file_content_metadata
-        # )
-        chunks= self.process_doc_simple_splitter(file_content_text, chunk_size, file_content_metadata, overlap_size=overlap_size)
-        return chunks
+    def process_file(self, file_content: str, chunk_size: int=900, overlap_size: int = 150):
+        settings = get_settings()
+        chunker = PageAwareRecursiveChunker(
+            ChunkingConfig(
+                chunk_size=chunk_size or settings.CHUNK_SIZE,
+                chunk_overlap=overlap_size if overlap_size is not None else settings.CHUNK_OVERLAP,
+                min_chunk_chars=settings.MIN_CHUNK_CHARS,
+                chunking_strategy=settings.CHUNKING_STRATEGY,
+                embedding_model=settings.EMBEDDING_MODEL_ID,
+                parent_child_enabled=settings.PARENT_CHILD_CHUNKING_ENABLED,
+            )
+        )
+        chunks = chunker.split(file_content)
+        return [ProcessedDocument(page_content=chunk.page_content, metadata=chunk.metadata) for chunk in chunks]
     
     def process_doc_simple_splitter(self, text: List[str], chunk_size: int, metadata: List[dict], spliiter_tag: str = "\n", overlap_size: int = 0) -> List[ProcessedDocument]:
         full_text = spliiter_tag.join(doc.strip() for doc in text if doc and doc.strip())

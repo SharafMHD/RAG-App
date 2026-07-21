@@ -176,7 +176,18 @@ cd src
 uv run python -m pytest -q
 ```
 
-### 11. Generate a new migration after model changes
+### 11. Sprint 4 migration and re-index after document-processing changes
+
+Sprint 4 adds chunk metadata columns and changes the default chunking strategy. Apply migrations, then reprocess/re-index existing knowledge bases so old chunks are regenerated with page-aware metadata.
+
+```bash
+cd src/models/db_schemes/rag_app_db
+PYTHONPATH=../../../../ uv run alembic upgrade head
+```
+
+Then call the process/index API or Celery workflow for each existing knowledge base with `do_reset=true`.
+
+### 12. Generate a new migration after model changes
 
 ```bash
 cd src/models/db_schemes/rag_app_db

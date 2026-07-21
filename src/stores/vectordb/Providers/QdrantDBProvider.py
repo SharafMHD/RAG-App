@@ -186,13 +186,21 @@ class QdrantDBProvider(VectorDBInterface):
             if not search_results or len(search_results) == 0:
                 return []
             
-            return [
-                RetrievedDocuments(
-                    text=result.payload["text"],
-                    score=result.score
-                ) 
-                for result in search_results
-            ]
+            retrieved_documents = []
+            for result in search_results:
+                metadata = (result.payload or {}).get("metadata") or {}
+                retrieved_documents.append(
+                    RetrievedDocuments(
+                        text=(result.payload or {}).get("text", ""),
+                        score=result.score,
+                        chunk_id=str(result.id) if result.id is not None else metadata.get("chunk_id"),
+                        metadata={**metadata, "chunk_id": str(result.id) if result.id is not None else metadata.get("chunk_id")},
+                        page_number=metadata.get("page_number") or metadata.get("page"),
+                        source=metadata.get("document_name") or metadata.get("file_name") or metadata.get("source"),
+                        retrieval_mode="vector",
+                    )
+                )
+            return retrieved_documents
 
         except Exception as e:
             self.logger.error(f"Error searching vectors: {e}")

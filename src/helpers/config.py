@@ -29,8 +29,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("FILE_ALLOWED_SIZE", "FILE_ALLOWED_SZIE"),
     )  # in MB
     UPLOAD_DIR: str = "assets/files"
-    FILE_DEFAULT_CHUNK_SIZE: int = 512000
-    FILE_OVERLAP_SIZE: int = 5120
+    FILE_DEFAULT_CHUNK_SIZE: int = 900
+    FILE_OVERLAP_SIZE: int = 150
+    CHUNKING_STRATEGY: str = "page_recursive_v1"
+    CHUNK_SIZE: int = 900
+    CHUNK_OVERLAP: int = 150
+    MIN_CHUNK_CHARS: int = 100
+    PARENT_CHILD_CHUNKING_ENABLED: bool = False
 
     # PostgreSQL database config
     POSTGRES_HOST: str = "localhost"
@@ -136,6 +141,12 @@ class Settings(BaseSettings):
             raise ValueError("FILE_OVERLAP_SIZE cannot be negative")
         if self.FILE_OVERLAP_SIZE >= self.FILE_DEFAULT_CHUNK_SIZE:
             raise ValueError("FILE_OVERLAP_SIZE must be smaller than FILE_DEFAULT_CHUNK_SIZE")
+        if self.CHUNK_SIZE <= 0:
+            raise ValueError("CHUNK_SIZE must be greater than 0")
+        if self.CHUNK_OVERLAP < 0 or self.CHUNK_OVERLAP >= self.CHUNK_SIZE:
+            raise ValueError("CHUNK_OVERLAP must be non-negative and smaller than CHUNK_SIZE")
+        if self.MIN_CHUNK_CHARS < 0:
+            raise ValueError("MIN_CHUNK_CHARS cannot be negative")
         if self.EMBEDDING_MODEL_SIZE is not None and self.EMBEDDING_MODEL_SIZE <= 0:
             raise ValueError("EMBEDDING_MODEL_SIZE must be greater than 0")
         if self.RATE_LIMIT_REQUESTS <= 0 or self.RATE_LIMIT_WINDOW_SECONDS <= 0:

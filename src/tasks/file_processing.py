@@ -227,6 +227,10 @@ async def _process_knowledge_base_files(
                     chunk_content=chunk.page_content,
                     chunk_metadata=chunk.metadata,
                     chunk_order=chunk_order,
+                    chunking_strategy=(chunk.metadata or {}).get("chunking_strategy"),
+                    embedding_model=(chunk.metadata or {}).get("embedding_model"),
+                    content_hash=(chunk.metadata or {}).get("content_hash"),
+                    parent_chunk_id=(chunk.metadata or {}).get("parent_chunk_id"),
                 )
                 for chunk_order, chunk in enumerate(chunks, start=1)
             ]

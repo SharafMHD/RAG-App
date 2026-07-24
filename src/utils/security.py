@@ -17,6 +17,7 @@ PUBLIC_PATH_PREFIXES = (
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/api/v1/admin",
 )
 
 

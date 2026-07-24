@@ -231,3 +231,13 @@ __marimo__/
 
 src/env.text
 src/.env
+
+# Frontend generated files
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env
+frontend/.env.local
+frontend/.env*.local
+frontend/tsconfig.tsbuildinfo
+.dev-logs/

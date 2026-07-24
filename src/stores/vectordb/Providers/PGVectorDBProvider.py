@@ -39,11 +39,15 @@ class PGVectorDBProvider(VectorDBInterface):
 
 
     async def connect(self) -> bool:
-        async with self.client() as session:
-            async with session.begin():
-                await session.execute(sql_text("CREATE EXTENSION IF NOT EXISTS vector"))
-            await session.commit()
-        return True
+        try:
+            async with self.client() as session:
+                async with session.begin():
+                    await session.execute(sql_text("CREATE EXTENSION IF NOT EXISTS vector"))
+                await session.commit()
+            return True
+        except Exception as exc:
+            self.logger.error("Error connecting to PGVector/PostgreSQL: %s", exc)
+            return False
     
     async def disconnect(self):
         pass

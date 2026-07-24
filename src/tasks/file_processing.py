@@ -60,7 +60,7 @@ async def _process_knowledge_base_files(
     ) = await get_setup_utilites()
 
     knowledge_base_model = await KnowledgeBaseDataModel.create_instance(db_client=db_client)
-    idempotency_manager = IdempotencyManager(db_client=db_client, db_engine=db_engine)
+    idempotency_manager = IdempotencyManager(db_client=db_client, knowledge_base_id=knowledge_base_id)
 
     task_args = {
         "knowledge_base_id": str(knowledge_base_id),
@@ -74,7 +74,6 @@ async def _process_knowledge_base_files(
 
     # FIX: Native await used directly on async idempotency manager methods
     should_execute, existing_execution = await idempotency_manager.should_execute_task(
-        celery_task_id=task_instance.request.id,
         task_name=task_name,
         task_args=task_args,
         task_time_limit=settings.CELERY_TASK_TIME_LIMIT,

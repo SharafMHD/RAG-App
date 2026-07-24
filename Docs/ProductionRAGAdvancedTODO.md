@@ -14,6 +14,7 @@ Each completed sprint has its own separate documentation file:
 - [x] [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md)
 - [x] [Sprint 3 — Prompting, Langfuse, and Structured Answers](Sprint3PromptingLangfuseStructuredAnswers.md)
 - [x] [Sprint 4 — Document Processing Quality](Sprint4DocumentProcessingQuality.md)
+- [x] [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md)
 
 ---
 
@@ -63,12 +64,12 @@ Plan: build the user-facing chat UI with **Next.js** using Vercel's chatbot temp
 
 <https://vercel.com/templates/next.js/chatbot>
 
-- [ ] Create a separate Next.js frontend app for chat UI.
-- [ ] Start from the Vercel Next.js chatbot template.
-- [ ] Connect the chat UI to this FastAPI RAG backend.
-- [ ] Support knowledge base selection in the UI.
-- [ ] Display assistant answers with citations/sources.
-- [ ] Display retrieved source metadata:
+- [x] Create a separate Next.js frontend app for chat UI. Completed in [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md).
+- [x] Start from a Next.js chatbot-style UI foundation. Completed in [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md).
+- [x] Connect the chat UI to this FastAPI RAG backend. Completed in [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md).
+- [x] Support knowledge base selection in the UI. Completed in [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md).
+- [x] Display assistant answers with citations/sources. Completed in [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md).
+- [x] Display retrieved source metadata:
   - document name
   - page number
   - chunk/source reference
@@ -81,7 +82,7 @@ Plan: build the user-facing chat UI with **Next.js** using Vercel's chatbot temp
   - optional comment
 - [ ] Send user feedback to backend and Langfuse where appropriate.
 - [ ] Add authentication/session handling before production.
-- [ ] Configure production frontend environment variables:
+- [x] Configure production frontend environment variables:
   - backend API URL
   - auth config
   - analytics/tracing config if needed
@@ -436,6 +437,7 @@ Each completed sprint has its own separate documentation file:
 - [Sprint 3 — Prompting, Langfuse, and Structured Answers](Sprint3PromptingLangfuseStructuredAnswers.md)
 - [Sprint 4 — Document Processing Quality](Sprint4DocumentProcessingQuality.md)
 - [Sprint 4 — Document Processing Quality Report](Sprint4DocumentProcessingQualityReport.md)
+- [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md)
 
 ---
 
@@ -544,16 +546,15 @@ Exit criteria met: ingestion now produces page-aware, metadata-rich chunks; the 
 
 Goal: ship a usable chat frontend using the Vercel Next.js chatbot template.
 
-- [ ] Create Next.js app from Vercel chatbot template.
-- [ ] Connect chat UI to FastAPI RAG backend.
-- [ ] Add knowledge base selection.
-- [ ] Render structured answers.
-- [ ] Render citations and source metadata.
-- [ ] Show loading/error states.
-- [ ] Add basic auth/session plan.
-- [ ] Configure frontend env vars for backend API URL.
+- [x] Create Next.js app from a chatbot-style foundation.
+- [x] Connect chat UI to FastAPI RAG backend.
+- [x] Add knowledge base selection.
+- [x] Render structured answers.
+- [x] Render citations and source metadata.
+- [x] Show loading/error states.
+- [x] Configure frontend env vars for backend API URL.
 
-Exit criteria: user can ask questions from the UI and see cited answers.
+Exit criteria met: user can ask questions from the UI and see cited answers. See [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md).
 
 ---
 

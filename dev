@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOCKER_DIR="$ROOT_DIR/docker"
+SRC_DIR="$ROOT_DIR/src"
+FRONTEND_DIR="$ROOT_DIR/frontend"
+LOG_DIR="$ROOT_DIR/.dev-logs"
+
+mkdir -p "$LOG_DIR"
+
+PIDS=()
+
+log() {
+  printf '\033[1;36m[dev]\033[0m %s\n' "$*"
+}
+
+fail() {
+  printf '\033[1;31m[dev:error]\033[0m %s\n' "$*" >&2
+  exit 1
+}
+
+cleanup() {
+  local exit_code=$?
+  if [ ${#PIDS[@]} -gt 0 ]; then
+    log "Stopping dev processes..."
+    for pid in "${PIDS[@]}"; do
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        kill "$pid" >/dev/null 2>&1 || true
+      fi
+    done
+  fi
+  exit "$exit_code"
+}
+trap cleanup EXIT INT TERM
+
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
+}
+
+list_listeners_on_port() {
+  local port="$1"
+  # macOS lsof is picky: use -nP and -tiTCP:PORT, not '-ti -iTCP:PORT',
+  # otherwise system daemons can be falsely reported for numeric ports.
+  lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+}
+
+stop_project_processes_on_port() {
+  local port="$1"
+  local pids pid cmd
+  pids="$(list_listeners_on_port "$port")"
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    cmd="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+    case "$cmd" in
+      *"$ROOT_DIR"*|*"uvicorn main:app"*|*"next dev"*|*"next-server"*|*"celery"*"flower"*)
+        log "Stopping existing project process on port $port: PID $pid"
+        kill "$pid" >/dev/null 2>&1 || true
+        ;;
+      *)
+        log "Leaving non-project process on port $port alone: PID $pid"
+        ;;
+    esac
+  done
+  sleep 1
+}
+
+ensure_port_free() {
+  local port="$1"
+  local pids
+  pids="$(list_listeners_on_port "$port")"
+  if [ -n "$pids" ]; then
+    fail "Port $port is still in use by non-project process(es): $pids. Stop them manually or change the app port. I will not kill unknown processes."
+  fi
+}
+
+wait_for_http() {
+  local name="$1"
+  local url="$2"
+  local attempts="${3:-60}"
+  local delay="${4:-1}"
+
+  log "Waiting for $name at $url ..."
+  for _ in $(seq 1 "$attempts"); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      log "$name is ready"
+      return 0
+    fi
+    sleep "$delay"
+  done
+  fail "$name did not become ready at $url"
+}
+
+start_bg() {
+  local name="$1"
+  local dir="$2"
+  local logfile="$3"
+  shift 3
+
+  log "Starting $name (logs: $logfile)"
+  (
+    cd "$dir"
+    "$@"
+  ) >"$logfile" 2>&1 &
+  local pid=$!
+  PIDS+=("$pid")
+  log "$name PID: $pid"
+}
+
+require_command docker
+require_command curl
+require_command uv
+require_command pnpm
+
+if ! docker info >/dev/null 2>&1; then
+  fail "Docker daemon is not running. Start Docker Desktop, then rerun ./dev"
+fi
+
+stop_project_processes_on_port 8000
+stop_project_processes_on_port 3000
+stop_project_processes_on_port 5555
+ensure_port_free 8000
+ensure_port_free 3000
+ensure_port_free 5555
+
+if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+  log "Installing frontend dependencies with pnpm..."
+  (cd "$FRONTEND_DIR" && pnpm install)
+fi
+
+log "Starting Docker infrastructure: rabbitmq redis pgvector qdrant"
+(cd "$DOCKER_DIR" && docker compose up -d rabbitmq redis pgvector qdrant)
+
+log "Running database migrations"
+(
+  cd "$SRC_DIR/models/db_schemes/rag_app_db"
+  PYTHONPATH=../../../../ uv run alembic upgrade head
+)
+
+start_bg "Celery worker" "$SRC_DIR" "$LOG_DIR/celery-worker.log" \
+  uv run python -m celery -A celery_app worker \
+    --queues=default,file_processing_queue,data_indexing_queue,log_retention_queue \
+    --loglevel=info \
+    -E
+
+start_bg "Celery beat" "$SRC_DIR" "$LOG_DIR/celery-beat.log" \
+  uv run python -m celery -A celery_app beat --loglevel=info
+
+if [ "${START_FLOWER:-1}" != "0" ]; then
+  start_bg "Flower" "$SRC_DIR" "$LOG_DIR/flower.log" \
+    uv run python -m celery -A celery_app flower --conf=FlowerConfig.py
+fi
+
+start_bg "FastAPI" "$SRC_DIR" "$LOG_DIR/fastapi.log" \
+  env PYTHONPATH=. uv run uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+wait_for_http "FastAPI liveness" "http://localhost:8000/api/v1/health/live" 90 1
+
+if [ "${START_FLOWER:-1}" != "0" ]; then
+  wait_for_http "Flower" "http://localhost:5555" 90 1
+fi
+
+start_bg "Next.js frontend" "$FRONTEND_DIR" "$LOG_DIR/frontend.log" \
+  pnpm run dev
+
+wait_for_http "Next.js frontend" "http://localhost:3000" 90 1
+
+cat <<EOF
+
+✅ Dev environment is running
+
+Frontend:      http://localhost:3000
+Backend:       http://localhost:8000
+Health:        http://localhost:8000/api/v1/health
+Flower:        http://localhost:5555
+Admin KBs:     http://localhost:3000/admin/knowledge-bases
+Admin settings:http://localhost:3000/admin/settings
+
+Logs:
+  FastAPI:       $LOG_DIR/fastapi.log
+  Celery worker: $LOG_DIR/celery-worker.log
+  Celery beat:   $LOG_DIR/celery-beat.log
+  Flower:        $LOG_DIR/flower.log
+  Frontend:      $LOG_DIR/frontend.log
+
+Press Ctrl+C to stop app processes.
+Docker services are left running; stop them with: cd docker && docker compose down
+
+EOF
+
+wait

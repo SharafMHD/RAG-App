@@ -2,6 +2,16 @@
 
 Commands for running the RAG application in **production** and **development** modes.
 
+## One-command development startup
+
+From the repository root, start the full development stack with:
+
+```bash
+./dev
+```
+
+The script starts Docker infrastructure, runs Alembic migrations, then starts Celery worker, Celery beat, Flower, FastAPI, and the Next.js frontend. Logs are written to `.dev-logs/`. Press `Ctrl+C` to stop app processes; Docker services are left running. To skip Flower, run `START_FLOWER=0 ./dev`.
+
 ## Production
 
 Production should run through Docker Compose so FastAPI, Celery, Redis, RabbitMQ, PostgreSQL/PGVector, Qdrant, Prometheus, Grafana, Flower, and Nginx use the same network and environment.
@@ -104,10 +114,14 @@ Edit `src/.env` with local settings and API keys if you need real LLM calls.
 
 ### 2. Start infrastructure dependencies
 
+Docker Desktop/daemon must be running before starting these services.
+
 ```bash
 cd docker
 docker compose up -d rabbitmq redis pgvector qdrant
 ```
+
+If FastAPI starts but `/api/v1/health` returns `503` with `database: error`, PostgreSQL is not reachable. Start Docker Desktop and rerun the Compose command above.
 
 ### 3. Run database migrations
 
@@ -176,7 +190,41 @@ cd src
 uv run python -m pytest -q
 ```
 
-### 11. Sprint 4 migration and re-index after document-processing changes
+### 11. Admin knowledge-base routes and UI
+
+Admin UI routes:
+
+```text
+http://localhost:3000/admin/knowledge-bases
+http://localhost:3000/admin/settings
+```
+
+These temporary admin API endpoints do not require API-key auth or permission checks, even when `REQUIRE_API_KEY=true`:
+
+```bash
+# Create knowledge base
+curl -X POST http://localhost:8000/api/v1/admin/knowledge-bases/create \
+  -H 'Content-Type: application/json' \
+  -d '{"knowledge_base_name":"admin-demo","description":"Admin-created KB","owner":"admin"}'
+
+# Process and index existing knowledge base
+curl -X POST http://localhost:8000/api/v1/admin/knowledge-bases/{knowledge_base_id}/process \
+  -H 'Content-Type: application/json' \
+  -d '{"file_id":null,"chunk_size":900,"overlap_size":150,"do_reset":true}'
+
+# Create KB, upload one file, then process and index
+curl -X POST http://localhost:8000/api/v1/admin/knowledge-bases/create-and-process \
+  -F 'knowledge_base_name=admin-upload-demo' \
+  -F 'description=Created and processed from admin route' \
+  -F 'owner=admin' \
+  -F 'do_reset=true' \
+  -F 'file=@/path/to/document.pdf'
+
+# Poll Celery task status
+curl http://localhost:8000/api/v1/admin/tasks/{workflow_task_id}
+```
+
+### 12. Sprint 4 migration and re-index after document-processing changes
 
 Sprint 4 adds chunk metadata columns and changes the default chunking strategy. Apply migrations, then reprocess/re-index existing knowledge bases so old chunks are regenerated with page-aware metadata.
 
@@ -187,7 +235,28 @@ PYTHONPATH=../../../../ uv run alembic upgrade head
 
 Then call the process/index API or Celery workflow for each existing knowledge base with `do_reset=true`.
 
-### 12. Generate a new migration after model changes
+### 13. Run the Next.js chat frontend
+
+Run in a separate terminal while FastAPI is available:
+
+```bash
+cd frontend
+cp .env.example .env.local
+pnpm install
+pnpm run dev
+```
+
+`pnpm run dev` cleans `.next` before starting to avoid stale Next.js chunk errors such as `Cannot find module './617.js'` after route/file changes.
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+If backend API-key protection is enabled, set `NEXT_PUBLIC_API_KEY` in `frontend/.env.local`.
+
+### 14. Generate a new migration after model changes
 
 ```bash
 cd src/models/db_schemes/rag_app_db

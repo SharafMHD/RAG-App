@@ -73,3 +73,35 @@ class ChunkDataModel(BaseDataModel):
             stmt = select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_knowledge_base_id == knowledge_base_id)
             result = await session.execute(stmt)
             return result.scalar() or 0
+
+    async def delete_chunks_by_asset(self, asset_id: UUID) -> bool:
+        async with self.db_client() as session:
+            result = await session.execute(delete(DataChunk).where(DataChunk.chunk_asset_id == asset_id))
+            await session.commit()
+        return result.rowcount > 0
+
+    async def get_all_data_chunks_by_knowledge_base(self, knowledge_base_id: UUID) -> list[DataChunk]:
+        async with self.db_client() as session:
+            result = await session.execute(
+                select(DataChunk).where(DataChunk.chunk_knowledge_base_id == knowledge_base_id).order_by(DataChunk.chunk_order.asc())
+            )
+            return result.scalars().all()
+
+    async def get_paged_chunks_by_asset(self, asset_id: UUID, page: int = 1, page_size: int = 20) -> tuple[list[DataChunk], int, int]:
+        async with self.db_client() as session:
+            total_result = await session.execute(
+                select(func.count(DataChunk.chunk_id)).where(DataChunk.chunk_asset_id == asset_id)
+            )
+            total_count = total_result.scalar_one_or_none() or 0
+            total_pages = total_count // page_size
+            if total_count % page_size > 0:
+                total_pages += 1
+            stmt = (
+                select(DataChunk)
+                .where(DataChunk.chunk_asset_id == asset_id)
+                .order_by(DataChunk.chunk_order.asc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+            result = await session.execute(stmt)
+            return result.scalars().all(), total_pages, total_count

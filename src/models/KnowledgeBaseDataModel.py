@@ -6,6 +6,8 @@ from .db_schemes import KnowledgeBase
 from .enums.DatabaseEnum import DatabaseEnum
 from sqlalchemy.dialects.postgresql import UUID , insert
 from sqlalchemy import select, delete
+from models.db_schemes import Asset, DataChunk
+from models.enums.AssetTypeEnum import AssetTypeEnum
 class KnowledgeBaseDataModel(BaseDataModel):
     def __init__(self, db_client: object):
         super().__init__(db_client)
@@ -83,21 +85,66 @@ class KnowledgeBaseDataModel(BaseDataModel):
         """Open session and query all knowledge_bases with pagination."""
         async with self.db_client() as session:
             async with session.begin():
-                """calculate total number of knowledge_bases in the database."""
-                total_docs = await session.execute(select(
-                    func.count(KnowledgeBase.knowledge_base_id)
-                    ))
-                """calculate total number of pages."""
-                total_docs = total_docs.scalar_one_or_none()
-                """calculate total number of pages."""
+                total_docs = await session.execute(select(func.count(KnowledgeBase.knowledge_base_id)))
+                total_docs = total_docs.scalar_one_or_none() or 0
                 total_pages = total_docs // page_size
-                """if there are remaining documents, add an extra page."""
                 if total_docs % page_size > 0:
                     total_pages += 1
-                """Retrieve all paged knowledge_bases from the database."""
                 query = select(KnowledgeBase).offset((page - 1) * page_size).limit(page_size)
-                knowledge_bases = await session.execute(query).scalars().all()
+                result = await session.execute(query)
+                knowledge_bases = result.scalars().all()
                 return knowledge_bases, total_pages, total_docs
+
+    async def get_all_paged_knowledge_bases_with_stats(self, page:int=1, page_size:int=12) -> tuple[list[dict], int, int]:
+        """Retrieve paged knowledge bases with document and chunk counts for admin UI."""
+        async with self.db_client() as session:
+            total_result = await session.execute(select(func.count(KnowledgeBase.knowledge_base_id)))
+            total_docs = total_result.scalar_one_or_none() or 0
+            total_pages = total_docs // page_size
+            if total_docs % page_size > 0:
+                total_pages += 1
+
+            document_counts = (
+                select(
+                    Asset.asset_knowledge_base_id.label("knowledge_base_id"),
+                    func.count(Asset.asset_id).label("documents_count"),
+                )
+                .where(Asset.asset_type == AssetTypeEnum.File.value)
+                .group_by(Asset.asset_knowledge_base_id)
+                .subquery()
+            )
+            chunk_counts = (
+                select(
+                    DataChunk.chunk_knowledge_base_id.label("knowledge_base_id"),
+                    func.count(DataChunk.chunk_id).label("chunks_count"),
+                )
+                .group_by(DataChunk.chunk_knowledge_base_id)
+                .subquery()
+            )
+            query = (
+                select(
+                    KnowledgeBase,
+                    func.coalesce(document_counts.c.documents_count, 0).label("documents_count"),
+                    func.coalesce(chunk_counts.c.chunks_count, 0).label("chunks_count"),
+                )
+                .outerjoin(document_counts, document_counts.c.knowledge_base_id == KnowledgeBase.knowledge_base_id)
+                .outerjoin(chunk_counts, chunk_counts.c.knowledge_base_id == KnowledgeBase.knowledge_base_id)
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+            )
+            result = await session.execute(query)
+            records = []
+            for knowledge_base, documents_count, chunks_count in result.all():
+                documents_count = int(documents_count or 0)
+                chunks_count = int(chunks_count or 0)
+                status = "ready" if chunks_count > 0 else "needs_processing" if documents_count > 0 else "empty"
+                records.append({
+                    "knowledge_base": knowledge_base,
+                    "documents_count": documents_count,
+                    "chunks_count": chunks_count,
+                    "status": status,
+                })
+            return records, total_pages, total_docs
 
     
     async def update_knowledge_base(self, knowledge_base_id: UUID, update_data: dict) -> bool:
@@ -115,9 +162,10 @@ class KnowledgeBaseDataModel(BaseDataModel):
             return True
         
     async def delete_knowledge_base(self, knowledge_base_id: UUID) -> bool:
-        """Delete a knowledge_base from the database."""
+        """Delete a knowledge_base and all related chunks/assets from the database."""
         async with self.db_client() as session:
-                query = delete(KnowledgeBase).where(KnowledgeBase.knowledge_base_id == knowledge_base_id)
-                result = await session.execute(query)
-                await session.commit()
+            await session.execute(delete(DataChunk).where(DataChunk.chunk_knowledge_base_id == knowledge_base_id))
+            await session.execute(delete(Asset).where(Asset.asset_knowledge_base_id == knowledge_base_id))
+            result = await session.execute(delete(KnowledgeBase).where(KnowledgeBase.knowledge_base_id == knowledge_base_id))
+            await session.commit()
         return result.rowcount > 0

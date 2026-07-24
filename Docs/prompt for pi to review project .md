@@ -21,7 +21,7 @@ Explore my entire codebase (all directories, not just the top level). Before mak
    - Any caching, batching, or async patterns
 
 ## Phase 2: Save Context for Future Sessions
-Once you understand the codebase, write a `/.pi/PI_Instructions.md` file at the project root summarizing:
+Once you understand the codebase, write a md file at the project root summarizing:
 - Project purpose and architecture overview
 - The coding conventions/patterns identified above (so future sessions follow the same style instead of introducing inconsistent patterns)
 - Key file locations and what each does

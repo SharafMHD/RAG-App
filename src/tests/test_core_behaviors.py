@@ -7,6 +7,7 @@ from controllers.ProcessFileController import ProcessFileController
 from routes.schemes.data import KnowledgeBaseData
 from routes.schemes.nlp import ChatAnswerResponse, SearchRequest
 from stores.llm.Templates.template_parser import TemplateParser
+from utils.security import PUBLIC_PATH_PREFIXES
 
 
 def test_search_request_rejects_blank_text():
@@ -96,6 +97,10 @@ def test_chat_answer_contract_matches_frontend_shape():
         "message",
     }
     assert payload["retrieval_metadata"]["strategy"] == "vector"
+
+
+def test_admin_routes_are_public_for_temporary_no_auth_access():
+    assert "/api/v1/admin" in PUBLIC_PATH_PREFIXES
 
 
 def test_simple_splitter_respects_overlap():

@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from routes import base, data, nlp
+from routes import admin, base, data, nlp
 from helpers.config import get_settings
 from stores.llm import LLMProvideFactory
 from stores.vectordb import VectorDBProviderFactory
@@ -88,3 +88,4 @@ setup_metrics_endpoint(app)
 app.include_router(base.base_router)
 app.include_router(data.data_router)
 app.include_router(nlp.nlp_router)
+app.include_router(admin.admin_router)

@@ -1,4 +1,4 @@
-from fastapi import UploadFile, Depends, APIRouter, status , Request
+from fastapi import UploadFile, Depends, APIRouter, status , Request, Query
 from fastapi.responses import JSONResponse
 from models import ResponseStatus
 from helpers.config import get_settings, Settings
@@ -20,6 +20,34 @@ data_router = APIRouter(
         prefix="/api/v1/data",
         tags=["api_v1" , "Data"],
     )
+
+
+@data_router.get("/knowledge-bases")
+async def list_knowledge_bases(request: Request, page: int = Query(default=1, ge=1), page_size: int = Query(default=100, ge=1, le=500)):
+    knowledge_base_model = await KnowledgeBaseDataModel.create_instance(db_client=request.app.db_client)
+    knowledge_bases, total_pages, total_count = await knowledge_base_model.get_all_paged_knowledge_bases(page=page, page_size=page_size)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "status": True,
+            "knowledge_bases": [
+                {
+                    "knowledge_base_id": str(knowledge_base.knowledge_base_id),
+                    "knowledge_base_name": knowledge_base.knowledge_base_name,
+                    "description": knowledge_base.description,
+                    "owner": knowledge_base.owner,
+                }
+                for knowledge_base in knowledge_bases
+            ],
+            "page": page,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "total_count": total_count,
+            "message": "Knowledge bases retrieved successfully",
+        },
+    )
+
+
 # Define the endpoint for creating a new knowledge_base
 @data_router.post("/knowledge-bases/create")
 async def create_knowledge_base(request:Request, knowledge_base_data: KnowledgeBaseData):

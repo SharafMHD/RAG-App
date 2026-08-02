@@ -30,6 +30,10 @@ class ProcessFileController(BaseController):
         file_path = os.path.join(self.knowledge_base_path, file_id)
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
+        if not file_extension:
+            with open(file_path, "rb") as file:
+                if file.read(5).startswith(b"%PDF"):
+                    file_extension = ProcessFileEnums.PDF.value
         
         if file_extension == ProcessFileEnums.TXT.value:
             return TextLoader(file_path, encoding='utf-8')

@@ -15,6 +15,7 @@ Each completed sprint has its own separate documentation file:
 - [x] [Sprint 3 — Prompting, Langfuse, and Structured Answers](Sprint3PromptingLangfuseStructuredAnswers.md)
 - [x] [Sprint 4 — Document Processing Quality](Sprint4DocumentProcessingQuality.md)
 - [x] [Sprint 5 — Next.js Chat UI MVP](Sprint5NextjsChatUIMVP.md)
+- [x] [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md)
 
 ---
 
@@ -74,13 +75,13 @@ Plan: build the user-facing chat UI with **Next.js** using Vercel's chatbot temp
   - page number
   - chunk/source reference
   - relevance/rerank score if useful
-- [ ] Add streaming response support once backend streaming endpoint is ready.
+- [x] Add streaming response support once backend streaming endpoint is ready. Completed in [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md).
 - [ ] Add upload/document management screens if needed.
-- [ ] Add feedback controls:
-  - thumbs up
-  - thumbs down
-  - optional comment
-- [ ] Send user feedback to backend and Langfuse where appropriate.
+- [x] Add feedback controls:
+   - thumbs up
+   - thumbs down
+   - optional comment
+- [x] Send user feedback to backend and Langfuse where appropriate. Completed in [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md).
 - [ ] Add authentication/session handling before production.
 - [x] Configure production frontend environment variables:
   - backend API URL
@@ -100,7 +101,7 @@ Priority: **High**
 - [x] Add hybrid retrieval: vector search + BM25. Completed in [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
 - [x] Add result fusion between vector and BM25 results. Completed with Reciprocal Rank Fusion in [Sprint 2 — Retrieval Quality Foundation](Sprint2RetrievalQualityFoundation.md).
 - [ ] Add re-ranking after initial retrieval.
-- [ ] Add query expansion.
+- [x] Add query expansion. Completed as bounded opt-in preprocessing in [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md).
 - [ ] Add optional HyDE mode.
 - [ ] Add optional multi-vector retrieval.
 
@@ -118,7 +119,7 @@ Priority: **High**
   - conversational
   - out-of-scope
 - [ ] Route each query type to different retrieval settings.
-- [ ] Add query decomposition for complex questions.
+- [x] Add query decomposition for complex questions. Completed as bounded opt-in preprocessing in [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md).
 - [ ] Add intent-aware prompts.
 
 Priority: **High**
@@ -542,7 +543,7 @@ Exit criteria met: ingestion now produces page-aware, metadata-rich chunks; the 
 
 ---
 
-## Sprint 5 — Next.js Chat UI MVP
+## Sprint 5 — Next.js Chat UI MVP ✅ Completed
 
 Goal: ship a usable chat frontend using the Vercel Next.js chatbot template.
 
@@ -562,15 +563,21 @@ Exit criteria met: user can ask questions from the UI and see cited answers. See
 
 Goal: improve UX and start learning from users.
 
-- [ ] Add FastAPI streaming response endpoint.
-- [ ] Connect streaming to Next.js chat UI.
-- [ ] Preserve final citations after stream completion.
-- [ ] Add thumbs up/down feedback UI.
-- [ ] Store feedback in backend.
-- [ ] Send feedback metadata to Langfuse.
+See [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md) for the verified implementation and QA summary.
+
+- [x] Add FastAPI streaming response endpoint.
+- [x] Connect streaming to Next.js chat UI.
+- [x] Preserve final citations after stream completion.
+- [x] Add thumbs up/down feedback UI.
+- [x] Store feedback in backend.
+- [x] Send feedback metadata to Langfuse.
+- [x] enhance the citation, sources and response UI.
+- [x] add Monitoring URLS in admin settings Required services besied each services for example langfuse URL,Flower URL,Grafana etc.
+- [x] Query expansion.
+- [x] Query decomposition.
 - [ ] Add admin/review workflow later.
 
-Exit criteria: UI streams answers and captures feedback tied to trace IDs.
+Exit criteria met for the verified Sprint 6 scope: the UI streams answers, replaces provisional text with the final validated response, preserves citations and source details, captures feedback tied to trace IDs, exposes admin monitoring values, and keeps query preprocessing opt-in. The deferred admin review workflow remains future work.
 
 ---
 
@@ -611,8 +618,8 @@ Exit criteria: app can run reliably on the target VPS with monitoring, backups, 
 
 ## Later / Advanced Sprints
 
-- [ ] Query expansion.
-- [ ] Query decomposition.
+- [x] Query expansion. Sprint 6 shipped the initial bounded opt-in version in [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md).
+- [x] Query decomposition. Sprint 6 shipped the initial bounded opt-in version in [Sprint 6 Streaming and Feedback Loop](Sprint6StreamingFeedbackLoop.md).
 - [ ] HyDE.
 - [ ] Agentic RAG.
 - [ ] Multi-modal RAG.

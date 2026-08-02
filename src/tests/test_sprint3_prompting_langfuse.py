@@ -1,11 +1,79 @@
+from collections.abc import Mapping
+from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import Literal
 from uuid import uuid4
 
+import pytest
+from pydantic import JsonValue
+
 from helpers.config import Settings
-from routes.nlp import _build_chat_contract
+from routes.nlp import _generation_failure_response
+from services.answer_finalization import build_chat_contract as _build_chat_contract
+from services.answer_finalization import (
+    should_report_generation_failure as _should_report_generation_failure,
+)
 from services.answer_validation import no_answer_text, validate_generated_answer
 from services.langfuse_service import LangfuseService
 from services.prompt_service import PromptService
+
+
+@dataclass(frozen=True, slots=True)
+class _ScoreCall:
+    name: str
+    value: float
+    trace_id: str
+    data_type: Literal["NUMERIC"]
+    comment: str | None
+    metadata: Mapping[str, JsonValue] | None
+
+
+class _RecordingLangfuseClient:
+    def __init__(self) -> None:
+        self.score_calls: list[_ScoreCall] = []
+        self.flush_calls = 0
+
+    def create_score(
+        self,
+        *,
+        name: str,
+        value: float,
+        trace_id: str,
+        data_type: Literal["NUMERIC"],
+        comment: str | None,
+        metadata: Mapping[str, JsonValue] | None,
+    ) -> None:
+        self.score_calls.append(
+            _ScoreCall(
+                name=name,
+                value=value,
+                trace_id=trace_id,
+                data_type=data_type,
+                comment=comment,
+                metadata=metadata,
+            )
+        )
+
+    def flush(self) -> None:
+        self.flush_calls += 1
+
+
+class _LangfuseFailure(RuntimeError):
+    pass
+
+
+class _FailingLangfuseClient:
+    def create_score(
+        self,
+        *,
+        name: str,
+        value: float,
+        trace_id: str,
+        data_type: Literal["NUMERIC"],
+        comment: str | None,
+        metadata: Mapping[str, JsonValue] | None,
+    ) -> None:
+        raise _LangfuseFailure
 
 
 def test_langfuse_disabled_returns_local_trace_id():
@@ -15,6 +83,53 @@ def test_langfuse_disabled_returns_local_trace_id():
     assert service.enabled is False
     assert service.client is None
     assert service.create_trace_id()
+
+
+def test_langfuse_feedback_score_returns_disabled_without_client():
+    service = LangfuseService(Settings(_env_file=None, LANGFUSE_ENABLED=False))
+
+    assert service.score_feedback(trace_id="trace-1", rating="thumbs_up") == "disabled"
+
+
+@pytest.mark.parametrize(
+    ("rating", "expected_value"),
+    [("thumbs_up", 1.0), ("thumbs_down", 0.0)],
+)
+def test_langfuse_feedback_score_forwards_rating_and_optional_fields(
+    rating: Literal["thumbs_up", "thumbs_down"],
+    expected_value: float,
+):
+    service = LangfuseService(Settings(_env_file=None, LANGFUSE_ENABLED=False))
+    client = _RecordingLangfuseClient()
+    service.client = client
+    metadata = {"surface": "answer", "attempt": 1}
+
+    status = service.score_feedback(
+        trace_id="trace-1",
+        rating=rating,
+        comment="Helpful context",
+        metadata=metadata,
+    )
+
+    assert status == "sent"
+    assert client.score_calls == [
+        _ScoreCall(
+            name="answer_feedback",
+            value=expected_value,
+            trace_id="trace-1",
+            data_type="NUMERIC",
+            comment="Helpful context",
+            metadata=metadata,
+        )
+    ]
+    assert client.flush_calls == 1
+
+
+def test_langfuse_feedback_score_contains_client_failure():
+    service = LangfuseService(Settings(_env_file=None, LANGFUSE_ENABLED=False))
+    service.client = _FailingLangfuseClient()
+
+    assert service.score_feedback(trace_id="trace-1", rating="thumbs_down") == "failed"
 
 
 def test_prompt_service_local_fallback_is_grounded_and_citation_required():
@@ -64,6 +179,19 @@ def test_answer_validation_repairs_missing_citation_with_top_source():
     assert validated.is_answered is True
     assert validated.cited_source_ids == ["source_1"]
     assert validated.answer.endswith("[source_1]")
+
+
+def test_generation_failure_with_retrieved_sources_is_reported_as_error():
+    retrieved_documents = [SimpleNamespace(text="grounded source")]
+
+    assert _should_report_generation_failure(None, retrieved_documents) is True
+    assert _should_report_generation_failure("   ", retrieved_documents) is True
+    assert _should_report_generation_failure("Answer [source_1]", retrieved_documents) is False
+    assert _should_report_generation_failure(None, []) is False
+
+    response = _generation_failure_response(uuid4())
+
+    assert response.status_code == 502
 
 
 def test_chat_contract_includes_prompt_metadata_and_filters_citations():

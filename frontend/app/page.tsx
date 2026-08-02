@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUp, Database, Globe2, MessageSquare, Paperclip, PanelLeft, Settings, SquarePen, Trash2 } from "lucide-react";
-import { AnswerDetails } from "@/components/answer-details";
-import { generateAnswer, listKnowledgeBases } from "@/lib/api/rag";
-import type { ChatAnswerResponse, KnowledgeBaseSummary, RetrievalStrategy } from "@/lib/api/types";
-
-type Message =
-  | { id: string; role: "user"; content: string }
-  | { id: string; role: "assistant"; content: string; response: ChatAnswerResponse };
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUp, Cpu, Globe2, MessageSquare, PanelLeft, Settings, SquarePen, Trash2 } from "lucide-react";
+import { ChatMessage } from "@/components/chat-message";
+import { getWelcome, listKnowledgeBases, streamAnswer } from "@/lib/api/rag";
+import { applyAnswerStreamEvent, assertNever, type ChatMessage as ChatMessageState } from "@/lib/chat-state";
+import type { KnowledgeBaseSummary, RetrievalStrategy } from "@/lib/api/types";
 
 const STORAGE_KEY = "rag-chat:selected-knowledge-base-id";
 const STRATEGY_KEY = "rag-chat:default-strategy";
@@ -25,10 +22,6 @@ function makeId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function isLikelyRtl(text: string): boolean {
-  return /[\u0600-\u06FF]/.test(text);
-}
-
 export default function ChatPage() {
   const [knowledgeBaseId, setKnowledgeBaseId] = useState("");
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseSummary[]>([]);
@@ -37,9 +30,10 @@ export default function ChatPage() {
   const [question, setQuestion] = useState("");
   const [limit, setLimit] = useState(5);
   const [strategy, setStrategy] = useState<RetrievalStrategy>("hybrid");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [generationModel, setGenerationModel] = useState<string | null>(null);
+  const [messages, setMessages] = useState<ChatMessageState[]>([]);
   const [isAnswering, setIsAnswering] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
+  const activeStream = useRef<AbortController | null>(null);
 
   const canSend = useMemo(() => knowledgeBaseId.trim().length > 0 && question.trim().length > 0 && !isAnswering, [knowledgeBaseId, question, isAnswering]);
 
@@ -72,25 +66,73 @@ export default function ChatPage() {
     if (Number.isFinite(savedTopK)) setLimit(savedTopK);
     updateKnowledgeBaseId(saved || process.env.NEXT_PUBLIC_DEFAULT_KNOWLEDGE_BASE_ID || "");
     refreshKnowledgeBases();
+    getWelcome().then(
+      (response) => setGenerationModel(response.generation_model),
+      () => setGenerationModel(null),
+    );
   }, [refreshKnowledgeBases, updateKnowledgeBaseId]);
+
+  useEffect(() => {
+    return () => activeStream.current?.abort();
+  }, []);
+
+  const clearChat = useCallback(() => {
+    activeStream.current?.abort();
+    activeStream.current = null;
+    setIsAnswering(false);
+    setMessages([]);
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = question.trim();
-    if (!text || !knowledgeBaseId.trim()) return;
+    const selectedKnowledgeBaseId = knowledgeBaseId.trim();
+    if (!text || !selectedKnowledgeBaseId || isAnswering) return;
 
-    setChatError(null);
+    activeStream.current?.abort();
+    const abortController = new AbortController();
+    const userMessageId = makeId();
+    const assistantMessageId = makeId();
+    activeStream.current = abortController;
     setIsAnswering(true);
     setQuestion("");
-    setMessages((current) => [...current, { id: makeId(), role: "user", content: text }]);
+    setMessages((current) => [
+      ...current,
+      { id: userMessageId, kind: "user", content: text },
+      { id: assistantMessageId, kind: "assistant_streaming", content: "", question: text },
+    ]);
 
     try {
-      const response = await generateAnswer(knowledgeBaseId.trim(), { text, limit, strategy });
-      setMessages((current) => [...current, { id: makeId(), role: "assistant", content: response.answer, response }]);
+      for await (const streamEvent of streamAnswer(
+        selectedKnowledgeBaseId,
+        { text, limit, strategy },
+        { signal: abortController.signal },
+      )) {
+        if (activeStream.current !== abortController) return;
+        switch (streamEvent.event) {
+          case "token":
+          case "final":
+          case "error":
+            setMessages((current) => applyAnswerStreamEvent(current, assistantMessageId, streamEvent));
+            break;
+          case "done":
+            return;
+          default:
+            return assertNever(streamEvent);
+        }
+      }
     } catch (error) {
-      setChatError(error instanceof Error ? error.message : "Unable to generate answer");
+      if (abortController.signal.aborted || activeStream.current !== abortController) return;
+      const message = error instanceof Error ? error.message : "Unable to generate answer";
+      setMessages((current) => applyAnswerStreamEvent(current, assistantMessageId, {
+        event: "error",
+        data: { detail: message, message },
+      }));
     } finally {
-      setIsAnswering(false);
+      if (activeStream.current === abortController) {
+        activeStream.current = null;
+        setIsAnswering(false);
+      }
     }
   }
 
@@ -102,13 +144,13 @@ export default function ChatPage() {
           <button title="Sidebar"><PanelLeft size={17} /></button>
         </div>
 
-        <button className="sidebar-action primary" type="button" onClick={() => setMessages([])}>
+        <button className="sidebar-action primary" type="button" onClick={clearChat}>
           <SquarePen size={16} /> New chat
         </button>
         <Link className="sidebar-action" href="/admin/knowledge-bases">
           <Settings size={16} /> Admin
         </Link>
-        <button className="sidebar-action" type="button" onClick={() => setMessages([])}>
+        <button className="sidebar-action" type="button" onClick={clearChat}>
           <Trash2 size={16} /> Delete all
         </button>
 
@@ -158,17 +200,7 @@ export default function ChatPage() {
             </section>
           ) : (
             <div className="conversation">
-              {messages.map((message) => (
-                <article className={`message ${message.role}`} key={message.id} dir={isLikelyRtl(message.content) ? "rtl" : "ltr"}>
-                  <div className="avatar">{message.role === "user" ? "U" : "AI"}</div>
-                  <div className="bubble">
-                    <p>{message.content}</p>
-                    {message.role === "assistant" ? <AnswerDetails response={message.response} /> : null}
-                  </div>
-                </article>
-              ))}
-              {isAnswering ? <div className="thinking">Thinking…</div> : null}
-              {chatError ? <div className="error-box">{chatError}</div> : null}
+              {messages.map((message) => <ChatMessage message={message} key={message.id} />)}
             </div>
           )}
         </div>
@@ -187,21 +219,9 @@ export default function ChatPage() {
           />
           <div className="composer-footer">
             <div className="composer-tools">
-              <button type="button" title="Attach"><Paperclip size={15} /></button>
-              <label>
-                <Database size={15} />
-                <select value={strategy} onChange={(event) => setStrategy(event.target.value as RetrievalStrategy)}>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="vector">Vector</option>
-                  <option value="bm25">BM25</option>
-                </select>
-              </label>
-              <label>
-                Top K
-                <input type="number" min={1} max={50} value={limit} onChange={(event) => setLimit(Number(event.target.value))} />
-              </label>
+              <span className="composer-model"><Cpu size={15} />{generationModel || "unavailable"}</span>
             </div>
-            <button className="send-circle" type="submit" disabled={!canSend}><ArrowUp size={16} /></button>
+            <button className="send-circle" type="submit" aria-label="Send message" disabled={!canSend}><ArrowUp size={16} /></button>
           </div>
         </form>
       </section>

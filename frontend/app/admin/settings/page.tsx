@@ -7,6 +7,18 @@ import type { HealthResponse, RetrievalStrategy } from "@/lib/api/types";
 
 const STRATEGY_KEY = "rag-chat:default-strategy";
 const TOP_K_KEY = "rag-chat:default-top-k";
+const SERVICE_CONFIG = [
+  { label: "FastAPI", value: process.env.NEXT_PUBLIC_FASTAPI_URL },
+  { label: "Flower", value: process.env.NEXT_PUBLIC_FLOWER_URL },
+  { label: "Prometheus", value: process.env.NEXT_PUBLIC_PROMETHEUS_URL },
+  { label: "Grafana", value: process.env.NEXT_PUBLIC_GRAFANA_URL },
+  { label: "Langfuse", value: process.env.NEXT_PUBLIC_LANGFUSE_URL },
+  { label: "PostgreSQL", value: process.env.NEXT_PUBLIC_POSTGRESQL_URL },
+  { label: "RabbitMQ", value: process.env.NEXT_PUBLIC_RABBITMQ_URL },
+  { label: "Redis", value: process.env.NEXT_PUBLIC_REDIS_URL },
+  { label: "Celery worker", value: process.env.NEXT_PUBLIC_CELERY_WORKER_URL },
+  { label: "Qdrant", value: process.env.NEXT_PUBLIC_QDRANT_URL },
+] as const;
 
 export default function AdminSettingsPage() {
   const [liveness, setLiveness] = useState<HealthResponse | null>(null);
@@ -97,14 +109,9 @@ export default function AdminSettingsPage() {
 
         <section className="admin-card">
           <h2>Required services</h2>
-          <ul className="service-list">
-            <li>FastAPI backend</li>
-            <li>PostgreSQL / PGVector</li>
-            <li>RabbitMQ broker</li>
-            <li>Redis result backend</li>
-            <li>Celery worker</li>
-            <li>Qdrant if configured</li>
-          </ul>
+          <div className="settings-list">
+            {SERVICE_CONFIG.map((service) => <ServiceConfigRow key={service.label} {...service} />)}
+          </div>
         </section>
       </div>
     </div>
@@ -118,4 +125,28 @@ function StatusRow({ label, value, ok }: { label: string; value: string; ok: boo
       <strong className={ok ? "ok" : "bad"}>{value}</strong>
     </div>
   );
+}
+
+function ServiceConfigRow({ label, value }: { label: string; value: string | undefined }) {
+  const displayValue = value?.trim();
+  const href = displayValue ? getSafeExternalUrl(displayValue) : null;
+
+  return (
+    <div>
+      <strong>{label}</strong>
+      {!displayValue ? <span>Not configured</span> : null}
+      {displayValue && href ? <a href={href} target="_blank" rel="noopener noreferrer">{href}</a> : null}
+      {displayValue && !href ? <span>{displayValue}</span> : null}
+    </div>
+  );
+}
+
+function getSafeExternalUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch (error) {
+    if (error instanceof TypeError) return null;
+    throw error;
+  }
 }

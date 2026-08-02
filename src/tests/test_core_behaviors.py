@@ -1,11 +1,14 @@
+import anyio
 import pytest
 from pydantic import ValidationError
 
 from helpers.config import Settings
 from controllers.DataController import DataController
 from controllers.ProcessFileController import ProcessFileController
+from routes.base import welcome_message
 from routes.schemes.data import KnowledgeBaseData
 from routes.schemes.nlp import ChatAnswerResponse, SearchRequest
+from services.document_processing import PDFExtractor
 from stores.llm.Templates.template_parser import TemplateParser
 from utils.security import PUBLIC_PATH_PREFIXES
 
@@ -58,6 +61,14 @@ def test_settings_accept_legacy_file_env_names_and_normalizes_enums():
 def test_settings_reject_invalid_chunk_overlap():
     with pytest.raises(ValidationError):
         Settings(_env_file=None, FILE_DEFAULT_CHUNK_SIZE=10, FILE_OVERLAP_SIZE=10)
+
+
+def test_welcome_message_exposes_generation_model():
+    settings = Settings(_env_file=None, GENERATION_MODEL_ID="test-model")
+
+    response = anyio.run(welcome_message, settings)
+
+    assert response["generation_model"] == "test-model"
 
 
 def test_upload_filename_is_sanitized_and_basenamed():
@@ -115,3 +126,14 @@ def test_simple_splitter_respects_overlap():
 
     assert [chunk.page_content for chunk in chunks] == ["abcd", "defg", "ghij"]
     assert chunks[0].metadata == {"source_documents": [{"source": "unit-test"}]}
+
+
+def test_extensionless_pdf_asset_uses_pdf_loader(tmp_path):
+    controller = ProcessFileController.__new__(ProcessFileController)
+    controller.knowledge_base_path = str(tmp_path)
+    asset_name = "981761b5-c340-41ec-879f-25d5a9a07d96_pdf"
+    (tmp_path / asset_name).write_bytes(b"%PDF-1.7\n")
+
+    loader = controller.get_file_loader(asset_name)
+
+    assert isinstance(loader, PDFExtractor)

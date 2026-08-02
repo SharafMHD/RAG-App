@@ -1,7 +1,9 @@
 from ..LLMInterface import LLMInterface
+from ..LLMInterface import LLMStreamingError, LLMStreamingUnsupportedError
 import cohere
 from ..LLMEnums import LLMEnums , CohereEums , DocumentTypeEums
 import logging
+from collections.abc import Iterator
 
 class CoHereProvider(LLMInterface):
         def __init__(self, api_key: str, 
@@ -65,6 +67,60 @@ class CoHereProvider(LLMInterface):
 
             return response.message.content[0].text
 
+        def generate_text_stream(
+            self,
+            prompt: str,
+            chat_history: list | None = None,
+            max_output_tokens: int | None = None,
+            temperature: float | None = None,
+        ) -> Iterator[str]:
+            if not self.client:
+                raise LLMStreamingError("Cohere client was not set")
+
+            if not self.generation_model:
+                raise LLMStreamingError("Cohere generation model was not set")
+
+            chat_stream = getattr(self.client, "chat_stream", None)
+            if not callable(chat_stream):
+                raise LLMStreamingUnsupportedError(
+                    "Cohere client does not support chat_stream"
+                )
+
+            max_output_tokens = max_output_tokens or self.default_output_max_tokens
+            temperature = self.default_generation_temperature if temperature is None else temperature
+            role_map = {
+                CohereEums.SYSTEM.value: "system",
+                CohereEums.USER.value: "user",
+                CohereEums.ASSISTANT.value: "assistant",
+            }
+            messages = [
+                {
+                    "role": role_map.get(message["role"], message["role"]),
+                    "content": message["text"],
+                }
+                for message in chat_history or []
+            ]
+            messages.append({"role": "user", "content": self.process_text(prompt)})
+
+            try:
+                stream = chat_stream(
+                    model=self.generation_model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_output_tokens,
+                )
+                for event in stream:
+                    if getattr(event, "type", None) != "content-delta":
+                        continue
+                    delta = getattr(event, "delta", None)
+                    message = getattr(delta, "message", None)
+                    content = getattr(message, "content", None)
+                    text = getattr(content, "text", None)
+                    if text:
+                        yield text
+            except Exception as exc:
+                raise LLMStreamingError("Cohere token streaming failed") from exc
+
         def embedd_text(self, text: str , document_type:str = None):
             if not self.client:
                 self.logger.error("CoHere client was not set.")
@@ -105,6 +161,4 @@ class CoHereProvider(LLMInterface):
                 "role" : role,
                 "text": self.process_text(prompt)
             }
-
-
 

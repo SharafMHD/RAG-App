@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-from contextlib import contextmanager, nullcontext
-from typing import Any, Iterator
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from typing import Any, Final, Literal, assert_never
 from uuid import uuid4
 
+from pydantic import JsonValue
+
 from helpers.config import Settings
+
+type FeedbackRating = Literal["thumbs_up", "thumbs_down"]
+type LangfuseScoreStatus = Literal["disabled", "sent", "failed"]
+
+FEEDBACK_SCORE_NAME: Final = "answer_feedback"
 
 
 class LangfuseService:
@@ -37,7 +45,7 @@ class LangfuseService:
                 release=settings.LANGFUSE_RELEASE,
                 sample_rate=settings.LANGFUSE_TRACE_SAMPLE_RATE,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001  # BROAD_EXCEPT_OK
             self.client = None
             self.enabled = False
 
@@ -45,9 +53,47 @@ class LangfuseService:
         if self.client and hasattr(self.client, "create_trace_id"):
             try:
                 return self.client.create_trace_id()
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001  # BROAD_EXCEPT_OK
+                return str(uuid4())
         return str(uuid4())
+
+    def score_feedback(
+        self,
+        trace_id: str,
+        rating: FeedbackRating,
+        *,
+        comment: str | None = None,
+        metadata: Mapping[str, JsonValue] | None = None,
+    ) -> LangfuseScoreStatus:
+        """Forward an answer rating to Langfuse without affecting persistence."""
+        if self.client is None:
+            return "disabled"
+
+        match rating:
+            case "thumbs_up":
+                score = 1.0
+            case "thumbs_down":
+                score = 0.0
+            case unreachable:
+                assert_never(unreachable)
+
+        try:
+            score_result = self.client.create_score(
+                name=FEEDBACK_SCORE_NAME,
+                value=score,
+                trace_id=trace_id,
+                data_type="NUMERIC",
+                comment=comment,
+                metadata=metadata,
+            )
+            if score_result is not None:
+                return "failed"
+            flush = getattr(self.client, "flush", None)
+            if callable(flush):
+                flush()
+        except Exception:  # noqa: BLE001  # BROAD_EXCEPT_OK
+            return "failed"
+        return "sent"
 
     @contextmanager
     def trace_answer(self, trace_id: str, *, input: Any = None, metadata: dict[str, Any] | None = None) -> Iterator[Any]:
@@ -71,12 +117,12 @@ class LangfuseService:
                 },
             ) as observation:
                 yield observation
-        except Exception:
+        except Exception:  # noqa: BLE001  # BROAD_EXCEPT_OK
             yield None
 
     def flush(self) -> None:
         if self.client and hasattr(self.client, "flush"):
             try:
                 self.client.flush()
-            except Exception:
-                pass
+            except Exception:  # noqa: BLE001  # BROAD_EXCEPT_OK
+                return

@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     HYBRID_TOP_N: int = 10
     RRF_K: int = 60
     MIN_RELEVANCE_SCORE: float = 0.0
+    QUERY_EXPANSION_ENABLED: bool = False
+    QUERY_DECOMPOSITION_ENABLED: bool = False
+    QUERY_PREPROCESSING_MAX_GENERATED_QUERIES: int = Field(default=3, ge=1, le=10)
+    QUERY_PREPROCESSING_TIMEOUT_SECONDS: float = Field(default=5.0, gt=0, le=30)
+    QUERY_PREPROCESSING_MAX_OUTPUT_TOKENS: int = Field(default=128, ge=1, le=512)
 
     # Templates settings
     DEFAULT_LANGUAGE: str = "en"

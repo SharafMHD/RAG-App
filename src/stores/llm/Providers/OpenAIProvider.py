@@ -1,10 +1,9 @@
 from ..LLMInterface import LLMInterface
 from openai import OpenAI
 from ..LLMEnums import LLMEnums , OPENAIEnums
-from ...LLMInterface import LLMInterface
-from openai import OpenAI
-from ...LLMEnums import LLMEnums , OPENAIEnums
+from ..LLMInterface import LLMStreamingError
 import logging
+from collections.abc import Iterator
 from typing import List, Union
 
 class OpenAIProvider(LLMInterface):
@@ -61,13 +60,16 @@ class OpenAIProvider(LLMInterface):
             self.construct_prompt(prompt=prompt, role=OPENAIEnums.USER.value)
         )
 
+        request_options = {
+            "model": self.generation_model,
+            "messages": messages,
+            "max_completion_tokens": max_output_tokens,
+        }
+        if not self.generation_model.startswith("gpt-5"):
+            request_options["temperature"] = temperature
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.generation_model,
-                messages=messages,
-                max_tokens=max_output_tokens,
-                temperature=temperature,
-            )
+            response = self.client.chat.completions.create(**request_options)
         except Exception as exc:
             self.logger.exception("Error while generating text with OpenAI: %s", exc)
             return None
@@ -77,6 +79,48 @@ class OpenAIProvider(LLMInterface):
             return None
 
         return response.choices[0].message.content
+
+    def generate_text_stream(
+        self,
+        prompt: str,
+        chat_history: list | None = None,
+        max_output_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> Iterator[str]:
+        if not self.client:
+            raise LLMStreamingError("OpenAI client was not set")
+
+        if not self.generation_model:
+            raise LLMStreamingError("OpenAI generation model was not set")
+
+        max_output_tokens = max_output_tokens or self.default_output_max_tokens
+        temperature = self.default_generation_temperature if temperature is None else temperature
+        messages = list(chat_history or [])
+        messages.append(
+            self.construct_prompt(prompt=prompt, role=OPENAIEnums.USER.value)
+        )
+
+        request_options = {
+            "model": self.generation_model,
+            "messages": messages,
+            "max_completion_tokens": max_output_tokens,
+            "stream": True,
+        }
+        if not self.generation_model.startswith("gpt-5"):
+            request_options["temperature"] = temperature
+
+        try:
+            stream = self.client.chat.completions.create(**request_options)
+            for chunk in stream:
+                choices = getattr(chunk, "choices", None)
+                if not choices:
+                    continue
+                delta = getattr(choices[0], "delta", None)
+                content = getattr(delta, "content", None)
+                if content:
+                    yield content
+        except Exception as exc:
+            raise LLMStreamingError("OpenAI token streaming failed") from exc
     
     def embedd_text(self, text: Union[str, List[str]], document_type:str =None):
         if not self.client:

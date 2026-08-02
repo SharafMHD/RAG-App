@@ -1,18 +1,43 @@
 from .BaseController import BaseController
+from dataclasses import dataclass
 from models.db_schemes import KnowledgeBase , DataChunk, RetrievedDocuments
 from stores.llm.LLMEnums import DocumentTypeEums
 from stores.retrieval import reciprocal_rank_fusion
 from helpers.config import get_settings, Settings
 from services.langfuse_service import LangfuseService
-from services.prompt_service import PromptService
+from services.prompt_service import PromptBundle, PromptService
+from services.query_preprocessing import (
+    GenerationClientQueryGenerator,
+    QueryPreprocessingMetadata,
+    QueryPreprocessingOptions,
+    QueryPreprocessingSelection,
+    QueryPreprocessingService,
+)
 from sqlalchemy import select
 from typing import List
 from uuid import UUID
 import json
 import math
 import re
+
+
+@dataclass(frozen=True, slots=True)
+class SearchIndexResult:
+    documents: list[RetrievedDocuments]
+    preprocessing: QueryPreprocessingMetadata
+
+
+@dataclass(frozen=True, slots=True)
+class RAGAnswerPreparation:
+    full_prompt: str | None
+    chat_history: list[dict[str, str]] | None
+    retrieved_documents: list[RetrievedDocuments]
+    prompt_bundle: PromptBundle | None
+    preprocessing: QueryPreprocessingMetadata
+
+
 class NLPController(BaseController):
-    def __init__(self,vector_db_client, generation_client,embedding_client, template_parser, db_client=None, settings: Settings | None = None, prompt_service: PromptService | None = None, langfuse_service: LangfuseService | None = None):
+    def __init__(self,vector_db_client, generation_client,embedding_client, template_parser, db_client=None, settings: Settings | None = None, prompt_service: PromptService | None = None, langfuse_service: LangfuseService | None = None, query_preprocessor: QueryPreprocessingService | None = None):
         super().__init__()
 
         self.vector_db_client = vector_db_client
@@ -23,6 +48,7 @@ class NLPController(BaseController):
         self.settings = settings or get_settings()
         self.langfuse_service = langfuse_service or LangfuseService(self.settings)
         self.prompt_service = prompt_service or PromptService(self.settings, self.langfuse_service)
+        self.query_preprocessor = query_preprocessor or QueryPreprocessingService(GenerationClientQueryGenerator(self.generation_client))
 
     async def create_collection_name(self, knowledge_base_id:UUID):
         collection_name = f"collection_{self.vector_db_client.default_vector_size}_{knowledge_base_id}".strip().replace(" ","_").lower()
@@ -179,10 +205,24 @@ class NLPController(BaseController):
         scored.sort(key=lambda document: document.score, reverse=True)
         return scored[:max(1, int(limit or 5))]
 
-    async def search_index(self, knowledge_base:KnowledgeBase, text: str, limit:int=5, strategy: str | None = None):
+    async def search_index(self, knowledge_base:KnowledgeBase, text: str, limit:int=5, strategy: str | None = None, preprocessing: QueryPreprocessingSelection | None = None):
+        result = await self.search_index_with_metadata(knowledge_base, text, limit, strategy, preprocessing)
+        return result.documents
+
+    async def search_index_with_metadata(self, knowledge_base:KnowledgeBase, text: str, limit:int=5, strategy: str | None = None, preprocessing: QueryPreprocessingSelection | None = None) -> SearchIndexResult:
         limit = max(1, int(limit or 5))
         strategy = (strategy or ("hybrid" if self.settings.HYBRID_SEARCH_ENABLED else "vector")).lower()
+        options = QueryPreprocessingOptions.from_settings(self.settings, preprocessing)
+        prepared = await self.query_preprocessor.prepare(text, options)
+        ranked_lists = [await self._search_single_query(knowledge_base, query, limit, strategy) for query in prepared.queries]
+        documents = ranked_lists[0] if len(ranked_lists) == 1 else reciprocal_rank_fusion(
+            ranked_lists,
+            k=self.settings.RRF_K,
+            top_n=limit,
+        )
+        return SearchIndexResult(documents, prepared.metadata)
 
+    async def _search_single_query(self, knowledge_base:KnowledgeBase, text: str, limit: int, strategy: str) -> list[RetrievedDocuments]:
         if strategy == "bm25":
             return await self.search_keyword(knowledge_base=knowledge_base, text=text, limit=limit)
         if strategy == "hybrid":
@@ -195,24 +235,45 @@ class NLPController(BaseController):
             )
         return await self.search_vector(knowledge_base=knowledge_base, text=text, limit=limit)
     
-    async def answer_rag_query(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10, strategy: str | None = None):
-        
-        answer, full_prompt, chat_history, retrieved_documents, prompt_bundle = None, None, None, [], None
-        #Step 1: Search index for relevant documents
-        retrieved_documents  = await self.search_index(
+    async def answer_rag_query(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10, strategy: str | None = None, preprocessing: QueryPreprocessingSelection | None = None):
+        answer, full_prompt, chat_history, retrieved_documents, prompt_bundle, _ = await self.answer_rag_query_with_metadata(
+            knowledge_base,
+            query_text,
+            limit,
+            strategy,
+            preprocessing,
+        )
+        return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
+
+    async def answer_rag_query_with_metadata(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10, strategy: str | None = None, preprocessing: QueryPreprocessingSelection | None = None):
+        preparation = await self.prepare_rag_answer(
+            knowledge_base,
+            query_text,
+            limit,
+            strategy,
+            preprocessing,
+        )
+        answer = None
+        if preparation.full_prompt and preparation.chat_history:
+            answer = self.generation_client.generate_text(
+                prompt=preparation.full_prompt,
+                chat_history=preparation.chat_history,
+            )
+        return answer, preparation.full_prompt, preparation.chat_history, preparation.retrieved_documents, preparation.prompt_bundle, preparation.preprocessing
+
+    async def prepare_rag_answer(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10, strategy: str | None = None, preprocessing: QueryPreprocessingSelection | None = None) -> RAGAnswerPreparation:
+        retrieval_result = await self.search_index_with_metadata(
             knowledge_base= knowledge_base,
             text= query_text,
             limit= limit,
             strategy=strategy,
+            preprocessing=preprocessing,
         )
-        
+        retrieved_documents = retrieval_result.documents
         if not retrieved_documents or len(retrieved_documents) == 0:
-            return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
-        
-        # step2: Construct grounded, citation-required LLM prompt
+            return RAGAnswerPreparation(None, None, retrieved_documents, None, retrieval_result.preprocessing)
         prompt_bundle = self.prompt_service.get_rag_prompt(query_text=query_text)
         system_prompt = prompt_bundle.system_prompt
-
         documents_prompts = "\n".join([
             "\n".join([
                 f"## Source ID: source_{idx + 1}",
@@ -223,8 +284,7 @@ class NLPController(BaseController):
 
         footer_prompt = prompt_bundle.footer_prompt
         if not system_prompt or not footer_prompt:
-            return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
-         # step3: Construct Generation Client Prompts
+            return RAGAnswerPreparation(None, None, retrieved_documents, prompt_bundle, retrieval_result.preprocessing)
         chat_history = [
             self.generation_client.construct_prompt(
                 prompt=system_prompt,
@@ -233,13 +293,4 @@ class NLPController(BaseController):
         ]
 
         full_prompt = "\n\n".join([documents_prompts, footer_prompt])
-        
-       # step4: Retrieve the Answer
-        answer = self.generation_client.generate_text(
-            prompt=full_prompt,
-            chat_history=chat_history
-        )
-        
-        return answer, full_prompt, chat_history, retrieved_documents, prompt_bundle
-
-       
+        return RAGAnswerPreparation(full_prompt, chat_history, retrieved_documents, prompt_bundle, retrieval_result.preprocessing)

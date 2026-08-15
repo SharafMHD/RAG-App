@@ -39,10 +39,11 @@ class FakeOpenAIClient:
         self.chat = SimpleNamespace(completions=completions)
 
 
-def openai_chunk(content=None, *, choices=True, delta=True):
+def openai_chunk(content=None, *, choices=True, delta=True, finish_reason=None):
     if not choices:
         return SimpleNamespace(choices=[])
     choice = SimpleNamespace()
+    choice.finish_reason = finish_reason
     if delta:
         choice.delta = SimpleNamespace(content=content)
     return SimpleNamespace(choices=[choice])
@@ -102,6 +103,37 @@ def test_openai_empty_stream_yields_no_tokens():
     provider, _ = make_openai_provider(FakeIterable([]))
 
     assert list(provider.generate_text_stream("question")) == []
+
+
+def test_openai_stream_rejects_length_truncated_completion():
+    stream = FakeIterable([openai_chunk("partial"), openai_chunk(finish_reason="length")])
+    provider, _ = make_openai_provider(stream)
+
+    with pytest.raises(LLMStreamingError, match="OpenAI token streaming was truncated"):
+        list(provider.generate_text_stream("question"))
+
+    assert provider.last_generation_finish_reason == "length"
+
+
+def test_openai_stream_retries_after_length_before_yielding_tokens():
+    first_stream = FakeIterable([openai_chunk("partial"), openai_chunk(finish_reason="length")])
+    second_stream = FakeIterable([openai_chunk("complete"), openai_chunk(" answer"), openai_chunk(finish_reason="stop")])
+    completions = FakeOpenAICompletions(first_stream)
+    provider = OpenAIProvider(api_key="test-key")
+    provider.set_genration_model("gpt-4o")
+    provider.client = FakeOpenAIClient(completions)
+
+    def create(**kwargs):
+        completions.kwargs = kwargs
+        completions.kwargs_history.append(kwargs)
+        return first_stream if len(completions.kwargs_history) == 1 else second_stream
+
+    completions.kwargs_history = []
+    completions.create = create
+
+    assert list(provider.generate_text_stream("question", max_output_tokens=10)) == ["complete", " answer"]
+    assert [call["max_completion_tokens"] for call in completions.kwargs_history] == [10, 20]
+    assert provider.last_generation_finish_reason == "stop"
 
 
 @pytest.mark.parametrize("failure", [RuntimeError("create failed"), ValueError("iterate failed")])

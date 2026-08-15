@@ -10,7 +10,7 @@ From the repository root, start the full development stack with:
 ./dev
 ```
 
-The script starts Docker infrastructure, runs Alembic migrations, then starts Celery worker, Celery beat, Flower, FastAPI, and the Next.js frontend. Logs are written to `.dev-logs/`. Press `Ctrl+C` to stop app processes; Docker services are left running. To skip Flower, run `START_FLOWER=0 ./dev`.
+The script starts Docker infrastructure, including Langfuse, runs Alembic migrations, then starts Celery worker, Celery beat, Flower, FastAPI, and the Next.js frontend. Logs are written to `.dev-logs/`. Press `Ctrl+C` to stop app processes; Docker services are left running. To skip Flower, run `START_FLOWER=0 ./dev`. To skip Langfuse, run `START_LANGFUSE=0 ./dev`.
 
 ## Production
 

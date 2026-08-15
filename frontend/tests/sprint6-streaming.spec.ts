@@ -55,10 +55,10 @@ function sendEvent(response: ServerResponse, event: string, data: unknown): void
 const finalResponse = {
   status: true,
   knowledge_base_id: "kb-stream",
-  answer: "The final answer replaced provisional tokens.",
+  answer: "The final answer replaced provisional tokens [source_1].",
   citations: [
     {
-      source_id: "source-final",
+      source_id: "source_1",
       rank: 1,
       score: 0.97,
       document_name: "stream-fixture.pdf",
@@ -177,7 +177,8 @@ test("streams a placeholder and incremental tokens before reconciling the final 
   releaseFinal.resolve();
   await expect(assistant).toContainText(finalResponse.answer);
   await expect(assistant).not.toContainText("Provisional token content");
-  await expect(page.getByText("stream-fixture.pdf")).toBeVisible();
+  await assistant.getByRole("button", { name: "View source_1: stream-fixture.pdf" }).click();
+  await expect(assistant.getByText("stream-fixture.pdf")).toBeVisible();
 });
 
 test("renders an in-conversation assistant error without answer details", async ({ page }) => {

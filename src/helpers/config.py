@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     PGVECTOR_INDEX_THREADHOLD: int = 1000
 
     # Retrieval settings
-    HYBRID_SEARCH_ENABLED: bool = False
+    HYBRID_SEARCH_ENABLED: bool = True
     BM25_ENABLED: bool = False
     VECTOR_TOP_K: int = 30
     BM25_TOP_K: int = 30

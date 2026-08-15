@@ -131,8 +131,17 @@ if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
   (cd "$FRONTEND_DIR" && pnpm install)
 fi
 
-log "Starting Docker infrastructure: rabbitmq redis pgvector qdrant"
-(cd "$DOCKER_DIR" && docker compose up -d rabbitmq redis pgvector qdrant)
+DOCKER_SERVICES=(rabbitmq redis pgvector qdrant)
+if [ "${START_LANGFUSE:-1}" != "0" ]; then
+  DOCKER_SERVICES+=(langfuse-web langfuse-worker)
+fi
+
+log "Starting Docker infrastructure: ${DOCKER_SERVICES[*]}"
+(cd "$DOCKER_DIR" && docker compose up -d "${DOCKER_SERVICES[@]}")
+
+if [ "${START_LANGFUSE:-1}" != "0" ]; then
+  wait_for_http "Langfuse" "http://localhost:3001/api/public/health" 180 2
+fi
 
 log "Running database migrations"
 (
@@ -168,6 +177,18 @@ start_bg "Next.js frontend" "$FRONTEND_DIR" "$LOG_DIR/frontend.log" \
 
 wait_for_http "Next.js frontend" "http://localhost:3000" 90 1
 
+FLOWER_STATUS="http://localhost:5555"
+FLOWER_LOG="        $LOG_DIR/flower.log"
+if [ "${START_FLOWER:-1}" = "0" ]; then
+  FLOWER_STATUS="skipped (START_FLOWER=0)"
+  FLOWER_LOG="        skipped"
+fi
+
+LANGFUSE_STATUS="http://localhost:3001"
+if [ "${START_LANGFUSE:-1}" = "0" ]; then
+  LANGFUSE_STATUS="skipped (START_LANGFUSE=0)"
+fi
+
 cat <<EOF
 
 ✅ Dev environment is running
@@ -175,7 +196,8 @@ cat <<EOF
 Frontend:      http://localhost:3000
 Backend:       http://localhost:8000
 Health:        http://localhost:8000/api/v1/health
-Flower:        http://localhost:5555
+Flower:        $FLOWER_STATUS
+Langfuse:      $LANGFUSE_STATUS
 Admin KBs:     http://localhost:3000/admin/knowledge-bases
 Admin settings:http://localhost:3000/admin/settings
 
@@ -183,8 +205,11 @@ Logs:
   FastAPI:       $LOG_DIR/fastapi.log
   Celery worker: $LOG_DIR/celery-worker.log
   Celery beat:   $LOG_DIR/celery-beat.log
-  Flower:        $LOG_DIR/flower.log
+  Flower:$FLOWER_LOG
   Frontend:      $LOG_DIR/frontend.log
+
+Docker service logs:
+  cd docker && docker compose logs -f ${DOCKER_SERVICES[*]}
 
 Press Ctrl+C to stop app processes.
 Docker services are left running; stop them with: cd docker && docker compose down

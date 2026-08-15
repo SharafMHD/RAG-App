@@ -170,7 +170,7 @@ def test_non_streaming_answer_endpoint_keeps_the_legacy_response_shape(monkeypat
     assert trace.output is not None
 
 
-def test_shared_finalizer_uses_the_validated_answer_for_response_and_trace():
+def test_shared_finalizer_rejects_missing_required_citations_for_response_and_trace():
     # Given
     trace = RecordingTrace()
     request = _finalization_request(
@@ -184,13 +184,13 @@ def test_shared_finalizer_uses_the_validated_answer_for_response_and_trace():
 
     # Then
     assert response is not None
-    assert response.answer == "The policy applies to the covered party. [source_1]"
-    assert response.citations[0].source_id == "source_1"
+    assert response.answer == no_answer_text("What is covered?")
+    assert response.citations == []
     assert trace.output == {
-        "answer": "The policy applies to the covered party. [source_1]",
-        "cited_source_ids": ["source_1"],
-        "is_answered": True,
-        "confidence": None,
+        "answer": no_answer_text("What is covered?"),
+        "cited_source_ids": [],
+        "is_answered": False,
+        "confidence": 0.0,
     }
 
 

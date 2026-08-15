@@ -9,3 +9,4 @@ celerybeat-schedule*
 *.sqlite3
 __pycache__/
 *.py[cod]
+Docs/Fund KB .pptx

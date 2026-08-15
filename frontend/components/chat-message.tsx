@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { LoaderCircle, MessageSquareText, ThumbsDown, ThumbsUp } from "lucide-react";
-import { AnswerDetails } from "@/components/answer-details";
+import { CitedAnswer } from "@/components/cited-answer";
 import { submitAnswerFeedback } from "@/lib/api/rag";
 import type { ChatAnswerResponse, FeedbackRating } from "@/lib/api/types";
 import { assertNever, type ChatMessage as ChatMessageState } from "@/lib/chat-state";
@@ -38,9 +38,12 @@ export function ChatMessage({ message }: { readonly message: ChatMessageState })
         <article className="message assistant" dir={isLikelyRtl(message.content) ? "rtl" : "ltr"}>
           <div className="avatar">AI</div>
           <div className="bubble">
-            <p>{message.content}</p>
+            <CitedAnswer
+              citations={message.response.citations}
+              content={message.content}
+              source_chunks={message.response.source_chunks}
+            />
             <FeedbackControls question={message.question} response={message.response} />
-            <AnswerDetails response={message.response} />
           </div>
         </article>
       );

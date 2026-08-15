@@ -168,7 +168,7 @@ def test_answer_validation_rejects_invalid_citation_ids_in_strict_mode():
     assert validated.answer == no_answer_text("What is covered?")
 
 
-def test_answer_validation_repairs_missing_citation_with_top_source():
+def test_answer_validation_rejects_missing_required_citation():
     validated = validate_generated_answer(
         "The law defines the insured person.",
         available_source_ids=["source_1", "source_2"],
@@ -176,9 +176,9 @@ def test_answer_validation_repairs_missing_citation_with_top_source():
         require_citations=True,
     )
 
-    assert validated.is_answered is True
-    assert validated.cited_source_ids == ["source_1"]
-    assert validated.answer.endswith("[source_1]")
+    assert validated.is_answered is False
+    assert validated.cited_source_ids == []
+    assert validated.answer == no_answer_text("Who is insured?")
 
 
 def test_generation_failure_with_retrieved_sources_is_reported_as_error():

@@ -13,6 +13,7 @@ from services.query_preprocessing import (
     QueryPreprocessingSelection,
     QueryPreprocessingService,
 )
+from services.retrieval_context import expand_with_adjacent_chunks, format_documents_for_prompt
 from sqlalchemy import select
 from typing import List
 from uuid import UUID
@@ -259,6 +260,8 @@ class NLPController(BaseController):
                 prompt=preparation.full_prompt,
                 chat_history=preparation.chat_history,
             )
+            if getattr(self.generation_client, "last_generation_finish_reason", None) == "length":
+                answer = None
         return answer, preparation.full_prompt, preparation.chat_history, preparation.retrieved_documents, preparation.prompt_bundle, preparation.preprocessing
 
     async def prepare_rag_answer(self, knowledge_base:KnowledgeBase, query_text:str, limit:int=10, strategy: str | None = None, preprocessing: QueryPreprocessingSelection | None = None) -> RAGAnswerPreparation:
@@ -269,17 +272,14 @@ class NLPController(BaseController):
             strategy=strategy,
             preprocessing=preprocessing,
         )
-        retrieved_documents = retrieval_result.documents
+        retrieved_documents = await expand_with_adjacent_chunks(self.db_client, knowledge_base.knowledge_base_id, retrieval_result.documents, max_documents=max(limit * 2, limit))
         if not retrieved_documents or len(retrieved_documents) == 0:
             return RAGAnswerPreparation(None, None, retrieved_documents, None, retrieval_result.preprocessing)
         prompt_bundle = self.prompt_service.get_rag_prompt(query_text=query_text)
         system_prompt = prompt_bundle.system_prompt
-        documents_prompts = "\n".join([
-            "\n".join([
-                f"## Source ID: source_{idx + 1}",
-                f"### Content: {self.generation_client.process_text(doc.text)}",
-            ])
-            for idx, doc in enumerate(retrieved_documents)
+        documents_prompts = format_documents_for_prompt([
+            RetrievedDocuments(**{**doc.model_dump(), "text": self.generation_client.process_text(doc.text)})
+            for doc in retrieved_documents
         ])
 
         footer_prompt = prompt_bundle.footer_prompt

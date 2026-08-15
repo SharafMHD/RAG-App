@@ -91,8 +91,7 @@ def validate_generated_answer(
     cited = [source_id for source_id in cited if source_id in available]
     answer = generated.answer
     if generated.is_answered and require_citations and not cited:
-        cited = [available_source_ids[0]]
-        answer = f"{answer.rstrip()} [{cited[0]}]"
+        return GeneratedAnswer(answer=no_answer_text(query_text), cited_source_ids=[], is_answered=False, confidence=0.0)
 
     return GeneratedAnswer(
         answer=answer,

@@ -23,6 +23,7 @@ class OpenAIProvider(LLMInterface):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
 
         self.generation_model = None
+        self.last_generation_finish_reason = None
 
         self.embedding_model = None
         self.embedd_size= None
@@ -45,6 +46,7 @@ class OpenAIProvider(LLMInterface):
         return text[:self.default_input_max_tokens].strip()
     
     def generate_text(self, prompt: str, chat_history: list | None = None, max_output_tokens: int = None, temperature: float = None):
+        self.last_generation_finish_reason = None
         if not self.client:
             self.logger.error("OpenAI client was not set.")
             return None
@@ -68,17 +70,29 @@ class OpenAIProvider(LLMInterface):
         if not self.generation_model.startswith("gpt-5"):
             request_options["temperature"] = temperature
 
-        try:
-            response = self.client.chat.completions.create(**request_options)
-        except Exception as exc:
-            self.logger.exception("Error while generating text with OpenAI: %s", exc)
-            return None
+        for output_tokens in (max_output_tokens, max_output_tokens * 2):
+            request_options["max_completion_tokens"] = output_tokens
+            try:
+                response = self.client.chat.completions.create(**request_options)
+            except Exception as exc:
+                self.logger.exception("Error while generating text with OpenAI: %s", exc)
+                return None
 
-        if not response or not response.choices or len(response.choices) == 0 or not response.choices[0].message:
-            self.logger.error("Error while generating text with OpenAI")
-            return None
+            if not response or not response.choices or len(response.choices) == 0 or not response.choices[0].message:
+                self.logger.error("Error while generating text with OpenAI")
+                return None
 
-        return response.choices[0].message.content
+            self.last_generation_finish_reason = getattr(response.choices[0], "finish_reason", None)
+            if self.last_generation_finish_reason == "length" and output_tokens == max_output_tokens:
+                self.logger.warning("Retrying OpenAI generation after length finish_reason")
+                continue
+            if self.last_generation_finish_reason not in (None, "stop"):
+                self.logger.error("OpenAI generation did not finish cleanly: %s", self.last_generation_finish_reason)
+                return None
+
+            return response.choices[0].message.content
+
+        return None
 
     def generate_text_stream(
         self,
@@ -87,6 +101,7 @@ class OpenAIProvider(LLMInterface):
         max_output_tokens: int | None = None,
         temperature: float | None = None,
     ) -> Iterator[str]:
+        self.last_generation_finish_reason = None
         if not self.client:
             raise LLMStreamingError("OpenAI client was not set")
 
@@ -100,27 +115,42 @@ class OpenAIProvider(LLMInterface):
             self.construct_prompt(prompt=prompt, role=OPENAIEnums.USER.value)
         )
 
-        request_options = {
+        base_request_options = {
             "model": self.generation_model,
             "messages": messages,
             "max_completion_tokens": max_output_tokens,
             "stream": True,
         }
         if not self.generation_model.startswith("gpt-5"):
-            request_options["temperature"] = temperature
+            base_request_options["temperature"] = temperature
 
-        try:
-            stream = self.client.chat.completions.create(**request_options)
-            for chunk in stream:
-                choices = getattr(chunk, "choices", None)
-                if not choices:
-                    continue
-                delta = getattr(choices[0], "delta", None)
-                content = getattr(delta, "content", None)
-                if content:
-                    yield content
-        except Exception as exc:
-            raise LLMStreamingError("OpenAI token streaming failed") from exc
+        for output_tokens in (max_output_tokens, max_output_tokens * 2):
+            tokens: list[str] = []
+            self.last_generation_finish_reason = None
+            request_options = {**base_request_options, "max_completion_tokens": output_tokens}
+            try:
+                stream = self.client.chat.completions.create(**request_options)
+                for chunk in stream:
+                    choices = getattr(chunk, "choices", None)
+                    if not choices:
+                        continue
+                    finish_reason = getattr(choices[0], "finish_reason", None)
+                    if finish_reason is not None:
+                        self.last_generation_finish_reason = finish_reason
+                    delta = getattr(choices[0], "delta", None)
+                    content = getattr(delta, "content", None)
+                    if content:
+                        tokens.append(content)
+            except Exception as exc:
+                raise LLMStreamingError("OpenAI token streaming failed") from exc
+            if self.last_generation_finish_reason == "length" and output_tokens == max_output_tokens:
+                continue
+            if self.last_generation_finish_reason not in (None, "stop"):
+                raise LLMStreamingError("OpenAI token streaming was truncated")
+            yield from tokens
+            return
+
+        raise LLMStreamingError("OpenAI token streaming was truncated")
     
     def embedd_text(self, text: Union[str, List[str]], document_type:str =None):
         if not self.client:

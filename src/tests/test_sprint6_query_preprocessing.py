@@ -88,6 +88,14 @@ def test_settings_disable_preprocessing_by_default():
     assert options.decompose is False
 
 
+def test_settings_enable_hybrid_retrieval_by_default():
+    # Given
+    settings = Settings(_env_file=None)
+
+    # Then
+    assert settings.HYBRID_SEARCH_ENABLED is True
+
+
 def test_preprocessor_adds_expansions_while_retaining_the_original_query():
     # Given
     generator = RecordingGenerator({
@@ -274,3 +282,22 @@ def test_answer_rag_query_returns_the_preprocessing_metadata_for_the_final_respo
     assert answer == "Grounded answer [source_1]"
     assert preprocessing.status == "applied"
     assert preprocessing.generated_queries == ("related query",)
+
+
+def test_answer_rag_query_rejects_length_truncated_generation():
+    # Given
+    controller = RecordingController(Settings(_env_file=None), QueryPreprocessingService(RecordingGenerator({})))
+    controller.generation_client.last_generation_finish_reason = "length"
+
+    # When
+    answer, _, _, _, _, _ = anyio.run(
+        controller.answer_rag_query_with_metadata,
+        None,
+        "Original query",
+        3,
+        "vector",
+        None,
+    )
+
+    # Then
+    assert answer is None

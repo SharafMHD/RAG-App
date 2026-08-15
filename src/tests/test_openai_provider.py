@@ -4,12 +4,16 @@ from stores.llm.Providers.OpenAIProvider import OpenAIProvider
 
 
 class FakeCompletions:
-    def __init__(self):
+    def __init__(self, finish_reason="stop", content="ok [source_1]"):
         self.kwargs = {}
+        self.kwargs_history = []
+        self.responses = [(finish_reason, content)]
 
     def create(self, **kwargs):
         self.kwargs = kwargs
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok [source_1]"))])
+        self.kwargs_history.append(kwargs)
+        finish_reason, content = self.responses.pop(0)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content), finish_reason=finish_reason)])
 
 
 class FakeClient:
@@ -52,3 +56,29 @@ def test_openai_generation_includes_temperature_for_non_gpt_5_models():
 
     assert answer == "ok [source_1]"
     assert completions.kwargs["temperature"] == 0.35
+
+
+def test_openai_generation_rejects_length_truncated_completion():
+    provider = OpenAIProvider(api_key="test-key")
+    provider.set_genration_model("gpt-4o")
+    completions = FakeCompletions(finish_reason="length")
+    provider.client = FakeClient(completions)
+
+    answer = provider.generate_text("Answer with a citation.", [])
+
+    assert answer is None
+    assert provider.last_generation_finish_reason == "length"
+
+
+def test_openai_generation_retries_once_after_length_finish_reason():
+    provider = OpenAIProvider(api_key="test-key")
+    provider.set_genration_model("gpt-4o")
+    completions = FakeCompletions()
+    completions.responses = [("length", "partial"), ("stop", "complete [source_1]")]
+    provider.client = FakeClient(completions)
+
+    answer = provider.generate_text("Answer with a citation.", [], max_output_tokens=25)
+
+    assert answer == "complete [source_1]"
+    assert [call["max_completion_tokens"] for call in completions.kwargs_history] == [25, 50]
+    assert provider.last_generation_finish_reason == "stop"

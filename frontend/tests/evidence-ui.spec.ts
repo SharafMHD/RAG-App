@@ -3,16 +3,19 @@ import type { ChatAnswerResponse } from "@/lib/api/types";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
 const KNOWLEDGE_BASE_ID = "kb-evidence";
-const LONG_TOKEN = "source_".repeat(70);
-const RTL_FILENAME = "دليل-السياسات.pdf";
 
 const evidenceResponse = {
   status: true,
   knowledge_base_id: KNOWLEDGE_BASE_ID,
-  answer: "The evidence is grouped by citation and retrieved source.",
+  answer: `**Policy details** [source_1], **operations** [source_2], and unresolved [source_404].
+
+| Period | Qualified service | Retirement age |
+|---|---:|---:|
+| 1 Dec 2023 - 30 Nov 2024 | 25 years [source_1] | 45 years |
+| 1 Dec 2042 - 30 Nov 2043 | 25 years | 54.5 years [source_2] |`,
   citations: [
     {
-      source_id: "source-policy",
+      source_id: "source_1",
       rank: 1,
       score: 0.982,
       document_name: "policy-handbook.pdf",
@@ -20,35 +23,27 @@ const evidenceResponse = {
       chunk_id: "chunk-policy-12",
     },
     {
-      source_id: "source-operations",
+      source_id: "source_2",
       rank: 2,
       score: 0.913,
-      document_name: "operations-guide.pdf",
-      page_number: 7,
-      chunk_id: "chunk-operations-7",
-    },
-    {
-      source_id: LONG_TOKEN,
-      rank: 3,
-      score: 0.877,
-      document_name: `${LONG_TOKEN}.pdf`,
+      document_name: "دليل-العمليات.pdf",
       page_number: null,
-      chunk_id: `chunk_${LONG_TOKEN}`,
+      chunk_id: "chunk-operations",
     },
   ],
   source_chunks: [
     {
-      source_id: "source-policy",
+      source_id: "source_1",
       rank: 1,
-      text: "A concise source excerpt that supports the answer.",
+      text: "A concise policy excerpt that supports the answer.",
       score: 0.982,
-      metadata: {},
+      metadata: { internal_label: "must remain hidden" },
     },
     {
-      source_id: LONG_TOKEN,
+      source_id: "source_2",
       rank: 2,
-      text: `Untrusted text ${LONG_TOKEN} must wrap without widening the conversation.`,
-      score: 0.877,
+      text: "مقتطف موجز يدعم الإجابة.",
+      score: 0.913,
       metadata: {},
     },
   ],
@@ -56,13 +51,13 @@ const evidenceResponse = {
   retrieval_metadata: {
     strategy: "hybrid",
     requested_top_k: 5,
-    returned_count: 3,
+    returned_count: 2,
     vector_top_k: 5,
     bm25_top_k: 5,
     rerank_top_n: null,
     min_relevance_score: null,
   },
-  trace_id: `trace_${LONG_TOKEN}`,
+  trace_id: "trace-evidence",
   message: "ok",
 } satisfies ChatAnswerResponse;
 
@@ -85,14 +80,12 @@ async function installAnswerFixture(page: Page, response: ChatAnswerResponse): P
     await route.fulfill({
       json: {
         status: true,
-        knowledge_bases: [
-          {
-            knowledge_base_id: KNOWLEDGE_BASE_ID,
-            knowledge_base_name: "Evidence Knowledge Base",
-            description: "Evidence UI fixture",
-            owner: "qa",
-          },
-        ],
+        knowledge_bases: [{
+          knowledge_base_id: KNOWLEDGE_BASE_ID,
+          knowledge_base_name: "Evidence Knowledge Base",
+          description: "Evidence UI fixture",
+          owner: "qa",
+        }],
         page: 1,
         page_size: 1,
         total_pages: 1,
@@ -115,130 +108,84 @@ async function renderAnswer(page: Page, response: ChatAnswerResponse): Promise<v
   await page.getByRole("combobox").selectOption(KNOWLEDGE_BASE_ID);
   await page.getByPlaceholder("Ask anything...").fill("Show the supporting evidence");
   await page.getByPlaceholder("Ask anything...").press("Enter");
-  await expect(page.locator(".answer-details")).toBeVisible();
+  await expect(page.locator(".cited-answer")).toBeVisible();
 }
 
-for (const width of [375, 768, 1280] as const) {
-  test(`keeps three citations and long source evidence readable at ${width}px`, async ({ page }) => {
-    // Given
-    await page.setViewportSize({ width, height: 900 });
-
-    // When
-    await renderAnswer(page, evidenceResponse);
-
-    // Then
-    await expect(page.locator(".evidence-chip")).toHaveCount(4);
-    await expect(page.locator(".citation-card")).toHaveCount(3);
-    const sourceDisclosure = page.locator(".evidence-disclosure").filter({ hasText: "Retrieved source chunks" });
-    await expect(sourceDisclosure).not.toHaveAttribute("open", "");
-    await sourceDisclosure.click();
-    await expect(page.locator(".source-card")).toHaveCount(2);
-    await expect(sourceDisclosure.locator("ol.source-list > li")).toHaveCount(2);
-    const overflow = await page.evaluate(() => ({
-      document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      evidence: Array.from(document.querySelectorAll<HTMLElement>(".answer-details"))
-        .some((element) => element.scrollWidth > element.clientWidth),
-    }));
-    expect(overflow.document).toBe(0);
-    expect(overflow.evidence).toBe(false);
-    if (width === 375) {
-      const traceValue = page.locator(".trace-chip dd");
-      const traceDimensions = await traceValue.evaluate((element) => ({
-        clientHeight: element.clientHeight,
-        scrollHeight: element.scrollHeight,
-      }));
-      expect(traceDimensions.clientHeight).toBeLessThan(80);
-      expect(traceDimensions.scrollHeight).toBeGreaterThan(traceDimensions.clientHeight);
-      await expect(traceValue).toHaveAttribute("tabindex", "0");
-    }
-  });
-}
-
-test("shows a composed no-answer and no-citation state", async ({ page }) => {
+test("renders only resolved markers as inline citation controls", async ({ page }) => {
   // Given
-  const emptyResponse = {
-    ...evidenceResponse,
-    answer: "",
-    citations: [],
-    source_chunks: [],
-    confidence: null,
-    retrieval_metadata: { ...evidenceResponse.retrieval_metadata, returned_count: 0 },
-  } satisfies ChatAnswerResponse;
+  await renderAnswer(page, evidenceResponse);
+  const answer = page.locator(".cited-answer-text");
 
   // When
-  await renderAnswer(page, emptyResponse);
+  const resolvedMarkers = answer.locator(".citation-marker");
 
   // Then
-  await expect(page.locator(".answer-evidence-empty")).toBeVisible();
-  await expect(page.locator(".citation-card, .source-card")).toHaveCount(0);
-  await expect(page.locator(".answer-details summary")).toHaveCount(0);
+  await expect(answer).toContainText("Policy details [source_1], operations [source_2], and unresolved [source_404].");
+  await expect(answer).not.toContainText("**");
+  await expect(answer.locator("strong")).toHaveText(["Policy details", "operations"]);
+  await expect(resolvedMarkers).toHaveCount(4);
+  await expect(answer).toContainText("[source_404]");
+  await expect(answer.getByRole("table")).toBeVisible();
+  await expect(answer.locator("th")).toHaveText(["Period", "Qualified service", "Retirement age"]);
+  await expect(answer.locator("tbody tr")).toHaveCount(2);
+  await expect(answer.locator("tbody tr").first()).toContainText("25 years [source_1]");
+  await expect(page.locator(".citation-disclosure")).toBeHidden();
+  await expect(page.locator(".answer-details, .meta-grid, .citation-list, .source-list")).toHaveCount(0);
 });
 
-test("keeps retrieved chunks discoverable when an answer has no citations", async ({ page }) => {
+test("reveals useful source details and keeps retrieval diagnostics hidden", async ({ page }) => {
   // Given
-  const noCitationResponse = {
-    ...evidenceResponse,
-    citations: [],
-    source_chunks: evidenceResponse.source_chunks.slice(0, 1),
-    retrieval_metadata: { ...evidenceResponse.retrieval_metadata, returned_count: 1 },
-  } satisfies ChatAnswerResponse;
+  await renderAnswer(page, evidenceResponse);
+  const marker = page.getByRole("button", { name: "View source_1: policy-handbook.pdf" }).first();
 
   // When
-  await renderAnswer(page, noCitationResponse);
-  const sourceDisclosure = page.locator(".evidence-disclosure");
-  await sourceDisclosure.click();
+  await marker.click();
 
   // Then
-  await expect(page.locator(".answer-evidence-empty")).toBeVisible();
-  await expect(page.locator(".citation-card")).toHaveCount(0);
-  await expect(page.locator(".source-card")).toHaveCount(1);
+  await expect(marker).toHaveAttribute("aria-expanded", "true");
+  const disclosure = page.locator(".citation-disclosure");
+  await expect(disclosure).toContainText("policy-handbook.pdf");
+  await expect(disclosure).toContainText("Page 12");
+  await expect(disclosure).toContainText("A concise policy excerpt that supports the answer.");
+  await expect(disclosure).not.toContainText(/0\.982|trace-evidence|hybrid|chunk-policy|must remain hidden/i);
 });
 
-test("inherits RTL reading direction and supports keyboard traversal of disclosures", async ({ page }) => {
+test("keeps one citation open and supports keyboard activation", async ({ page }) => {
   // Given
-  await page.setViewportSize({ width: 768, height: 900 });
+  await renderAnswer(page, evidenceResponse);
+  const first = page.getByRole("button", { name: "View source_1: policy-handbook.pdf" }).first();
+  const second = page.getByRole("button", { name: "View source_2: دليل-العمليات.pdf" }).first();
+  await first.focus();
+  await page.keyboard.press("Enter");
+
+  // When
+  await second.focus();
+  await page.keyboard.press("Space");
+
+  // Then
+  await expect(first).toHaveAttribute("aria-expanded", "false");
+  await expect(second).toHaveAttribute("aria-expanded", "true");
+  await expect(second).toBeFocused();
+  await expect(page.locator(".citation-disclosure")).toContainText("دليل-العمليات.pdf");
+});
+
+test("preserves RTL direction and wraps citation content on mobile", async ({ page }) => {
+  // Given
+  await page.setViewportSize({ width: 375, height: 900 });
   const rtlResponse = {
     ...evidenceResponse,
-    answer: "توضح الإجابة الأدلة والمصادر المرتبطة بها بوضوح.",
-    citations: evidenceResponse.citations.map((citation, index) => ({
-      ...citation,
-      document_name: index === 0 ? RTL_FILENAME : citation.document_name,
-    })),
+    answer: "توضح **السياسة** التفاصيل [source_2] دون تغيير **اتجاه النص.",
   } satisfies ChatAnswerResponse;
 
   // When
   await renderAnswer(page, rtlResponse);
-  const citationSummary = page.locator(".evidence-disclosure > summary").first();
-  const sourceSummary = page.locator(".evidence-disclosure > summary").last();
-  await citationSummary.focus();
+  await page.getByRole("button", { name: "View source_2: دليل-العمليات.pdf" }).click();
 
   // Then
-  await expect(page.locator("article.message.assistant")).toHaveAttribute("dir", "rtl");
-  await expect(page.locator(".answer-details")).toHaveCSS("direction", "rtl");
-  await expect(page.locator(".evidence-chip").first()).toHaveCSS("direction", "ltr");
-  await expect(page.locator(".citation-metadata > div").first()).toHaveCSS("direction", "ltr");
-  const filename = page.locator(".citation-card header strong").first();
-  await expect(filename).toHaveText(RTL_FILENAME);
-  const filenameReadsStemBeforeExtension = await filename.evaluate((element) => {
-    const textNode = document.createTreeWalker(element, NodeFilter.SHOW_TEXT).nextNode();
-    if (!(textNode instanceof Text)) return false;
-    const extensionStart = textNode.data.lastIndexOf(".");
-    if (extensionStart < 1) return false;
-
-    const stemRange = document.createRange();
-    stemRange.setStart(textNode, 0);
-    stemRange.setEnd(textNode, extensionStart);
-    const extensionRange = document.createRange();
-    extensionRange.setStart(textNode, extensionStart);
-    extensionRange.setEnd(textNode, textNode.length);
-    return extensionRange.getBoundingClientRect().left > stemRange.getBoundingClientRect().left;
-  });
-  expect(filenameReadsStemBeforeExtension).toBe(true);
-  await expect(citationSummary).toHaveCSS("direction", "ltr");
-  await expect(citationSummary).toBeFocused();
-  await expect(citationSummary).toHaveCSS("outline-style", "solid");
-  await page.keyboard.press("Tab");
-  await expect(sourceSummary).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(sourceSummary.locator("..")).toHaveAttribute("open", "");
+  const assistantMessage = page.locator("article.message.assistant");
+  await expect(assistantMessage).toHaveAttribute("dir", "rtl");
+  await expect(assistantMessage.locator(".cited-answer-text strong")).toHaveText("السياسة");
+  await expect(assistantMessage).toContainText("دون تغيير **اتجاه النص.");
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBe(0);
 });

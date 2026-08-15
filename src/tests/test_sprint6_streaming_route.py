@@ -228,7 +228,7 @@ def test_stream_route_exists_and_uses_sse_content_type(monkeypatch):
 )
 def test_stream_route_emits_tokens_then_validated_final_then_done(monkeypatch, chat_history):
     # Given
-    iterator = RecordingIterator(["provisional ", "answer"])
+    iterator = RecordingIterator(["provisional ", "answer [source_1]"])
     _install_route_fakes(monkeypatch, _preparation(chat_history=chat_history))
     request = Request(_fake_app(iterator))
 
@@ -239,7 +239,7 @@ def test_stream_route_emits_tokens_then_validated_final_then_done(monkeypatch, c
     assert [frame.event for frame in frames] == ["token", "token", "final", "done"]
     assert [frame.model_dump()["data"]["content"] for frame in frames[:2]] == [
         "provisional ",
-        "answer",
+        "answer [source_1]",
     ]
     assert frames[2].model_dump()["data"]["response"]["answer"] == (
         "provisional answer [source_1]"
